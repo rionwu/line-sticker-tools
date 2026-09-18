@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LINE 動態貼圖專業製作工具</title>
+    <!-- 引入全球穩定 CDN 套件 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.11/pako.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --primary-light: #eeef2;
+            --success: #10b981;
+            --danger: #ef4444;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px -2px rgba(0,0,0,0.08);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: var(--text-main); padding: 16px; min-height: 100vh; }
+        .container { max-width: 1080px; margin: 0 auto; }
+
+        /* App Header */
+        .app-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 4px 0; }
+        .app-title { font-size: 1.35rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .app-badge { background: #e0e7ff; color: var(--primary); font-size: 0.75rem; padding: 2px 8px; border-radius: 99px; font-weight: 700; }
+
+        /* Card Styles */
+        .card { background: var(--card-bg); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-bottom: 20px; box-shadow: var(--shadow-md); }
+        .step-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; color: var(--text-main); }
+        .step-num { background: var(--primary); color: white; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; }
+
+        /* Upload Area */
+        .upload-area { border: 2px dashed #cbd5e1; border-radius: var(--radius-md); padding: 36px 16px; text-align: center; cursor: pointer; background: #fafafa; transition: all 0.2s; }
+        .upload-area:hover { border-color: var(--primary); background: #f5f3ff; }
+        .upload-icon { font-size: 2.2rem; margin-bottom: 8px; display: block; }
+
+        /* Stage Area */
+        .stage-container { position: relative; display: inline-block; width: 100%; max-width: 600px; margin: 0 auto; user-select: none; touch-action: none; border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-sm); }
+        video { width: 100%; display: block; background: #000; }
+        canvas.overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
+
+        /* Controls Panel */
+        .control-panel { background: #f8fafc; border: 1px solid var(--border); padding: 14px; border-radius: var(--radius-md); margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+        .control-group h4 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+        .slider-item { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 600; }
+        .slider-item input[type="range"] { flex: 1; accent-color: var(--primary); height: 20px; }
+
+        /* Buttons & Forms */
+        .btn { background: var(--primary); color: white; border: none; padding: 12px 16px; border-radius: var(--radius-md); font-weight: 700; cursor: pointer; width: 100%; font-size: 0.95rem; margin-top: 10px; transition: all 0.2s; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; }
+        .btn-auto { background: var(--success); }
+        .btn-auto:hover { background: #059669; }
+        .btn-sec { background: #0284c7; }
+        .btn-sec:hover { background: #0369a1; }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #dc2626; }
+        
+        input[type="number"].grid-input { width: 55px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; font-weight: bold; text-align: center; }
+
+        /* Grid Items */
+        .stickers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; margin-top: 14px; }
+        .sticker-card { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; background: #fff; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; }
+        .sticker-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .sticker-preview { width: 90px; height: 90px; background: #0f172a; border-radius: 8px; object-fit: contain; }
+
+        /* Export Bar */
+        .export-options-bar { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 14px; border-radius: var(--radius-md); }
+        .export-select { padding: 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.9rem; font-weight: bold; background: white; outline: none; }
+
+        /* Progress Bar */
+        .progress-container { width: 100%; margin-top: 12px; display: none; }
+        .progress-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-main); }
+        .progress-bar-bg { width: 100%; height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
+        .progress-bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #10b981, #06b6d4); transition: width 0.2s ease-in-out; }
+
+        /* Modal Design (UX/UI Optimized) */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; z-index: 999; }
+        .editor-modal { background: #0f172a; color: #f8fafc; border-radius: var(--radius-lg); width: 1000px; max-width: 100vw; height: 100vh; max-height: 100vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        @media (min-width: 768px) {
+            .editor-modal { height: 90vh; max-height: 850px; max-width: 95vw; border-radius: var(--radius-lg); }
+        }
+
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #334155; font-size: 1rem; font-weight: bold; background: #1e293b; }
+        .modal-body { display: flex; flex-direction: column; flex: 1; overflow-y: auto; padding: 16px; gap: 16px; }
+        @media (min-width: 768px) {
+            .modal-body { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+        }
+
+        /* Modal Preview Canvas */
+        .preview-box-wrapper { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+        .preview-box { position: relative; width: 100%; height: 45vh; min-height: 250px; border-radius: var(--radius-md); overflow: hidden; background: #020617; touch-action: none; display: flex; align-items: center; justify-content: center; border: 1px solid #334155; }
+        @media (min-width: 768px) { .preview-box { height: 420px; } }
+
+        .preview-box.bg-light { background: #ffffff !important; }
+        .preview-box.bg-dark { background: #0f172a !important; }
+        .preview-box.bg-grid { 
+            background-image: linear-gradient(45deg, #334155 25%, transparent 25%), linear-gradient(-45deg, #334155 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #334155 75%), linear-gradient(-45deg, transparent 75%, #334155 75%);
+            background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0px; background-color: #0f172a;
+        }
+
+        .bg-toggles { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px); padding: 4px; border-radius: 8px; z-index: 10; border: 1px solid #334155; }
+        .bg-toggle-btn { border: none; background: transparent; color: #94a3b8; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        .bg-toggle-btn.active { background: #334155; color: #fff; }
+
+        .zoom-controls { position: absolute; bottom: 10px; left: 10px; display: flex; gap: 6px; z-index: 10; }
+        .mode-badge { position: absolute; top: 10px; left: 10px; background: rgba(15,23,42,0.85); color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; z-index: 10; border: 1px solid #334155; }
+
+        #previewCanvas { transform-origin: center center; cursor: crosshair; }
+
+        .edit-section { background: #1e293b; border: 1px solid #334155; border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+        
+        .frame-stepper { display: flex; justify-content: space-between; align-items: center; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }
+        .step-btn { border: none; background: transparent; color: #38bdf8; font-weight: bold; padding: 8px 12px; cursor: pointer; font-size: 0.85rem; }
+        .frame-indicator { font-size: 0.85rem; color: #94a3b8; font-weight: 600; }
+
+        .tool-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .btn-outline { border: 1px solid #334155; background: #0f172a; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: #cbd5e1; min-height: 40px; }
+        .btn-outline.active { border-color: var(--primary); color: #818cf8; background: #1e1b4b; }
+
+        .panel-controls { display: flex; flex-direction: column; gap: 12px; background: #1e293b; border: 1px solid #334155; border-radius: var(--radius-md); padding: 14px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label { font-size: 0.8rem; font-weight: 600; color: #94a3b8; }
+        textarea.text-input { width: 100%; height: 60px; padding: 8px; border-radius: 8px; border: 1px solid #334155; font-size: 0.9rem; resize: none; outline: none; background: #0f172a; color: #fff; }
+
+        .option-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .segmented-control { display: flex; background: #0f172a; padding: 2px; border-radius: 8px; border: 1px solid #334155; }
+        .segment-btn { flex: 1; border: none; background: transparent; padding: 6px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: #94a3b8; text-align: center; }
+        .segment-btn.active { background: var(--primary); color: white; }
+
+        select.select-input { padding: 8px; border-radius: 8px; border: 1px solid #334155; font-size: 0.85rem; background: #0f172a; color: #fff; }
+
+        .footer-bar { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid #334155; background: #1e293b; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; max-width: 160px; }
+        .btn-cancel { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        #status { font-weight: bold; color: #38bdf8; margin-top: 10px; text-align: center; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="app-header">
+        <div class="app-title">
+            <span>🎬 LINE 動態貼圖工作室</span>
+            <span class="app-badge">Pro 2.0</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <span class="upload-icon">📁</span>
+            <p style="font-weight: 700; color: var(--text-main);">點擊上傳動態影片</p>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">支援 MP4 / WebM 格式檔案</p>
+            <input type="file" id="fileInput" accept="video/*" style="display:none" onchange="loadVideo(event)">
+        </div>
+    </div>
+
+    <div class="card" id="editorCard" style="display:none;">
+        <div class="step-title">
+            <span class="step-num">1</span>
+            <span>定位網格與自動去背處理</span>
+        </div>
+        
+        <div style="text-align: center; margin-top: 8px;">
+            <div class="stage-container">
+                <video id="mainVideo" loop muted playsinline></video>
+                <canvas id="overlayCanvas" class="overlay"></canvas>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>網格排列設定</h4>
+                <div class="slider-item">
+                    <span>直排 (列):</span>
+                    <input type="number" id="gridRows" class="grid-input" min="1" max="10" value="2" onchange="initGridLines()">
+                    <span style="margin: 0 4px; color: var(--text-muted);">✕</span>
+                    <span>橫排 (欄):</span>
+                    <input type="number" id="gridCols" class="grid-input" min="1" max="10" value="2" onchange="initGridLines()">
+                </div>
+            </div>
+
+            <div class="control-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="enableKeying" checked onchange="drawGrid()">
+                    <label for="enableKeying"><b>開啟漫水去背</b></label>
+                    <input type="color" id="keyColor" value="#ffffff" onchange="drawGrid()" style="border:none; width:28px; height:28px; cursor:pointer; border-radius:4px;">
+                    <span>底色</span>
+                </div>
+                <div class="slider-item" style="margin-top: 8px;">
+                    <span>去背容許值:</span>
+                    <input type="range" id="keyTolerance" min="5" max="150" value="45" oninput="document.getElementById('tolVal').innerText=this.value; drawGrid();">
+                    <span id="tolVal" style="width: 30px; text-align: right;">45</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+            <button class="btn btn-auto" onclick="autoDetectGrid()">✨ 自動定位分割線</button>
+            <button class="btn btn-sec" onclick="extractAllStickers()">✂️ 拆分貼圖 (限制 20 幀)</button>
+        </div>
+        <div id="status"></div>
+
+        <div id="stickersListSection" style="display:none; margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
+            <div class="step-title">
+                <span class="step-num">2</span>
+                <span>貼圖微調與文字編輯</span>
+            </div>
+
+            <div class="stickers-grid" id="stickersGrid"></div>
+            
+            <div class="export-options-bar">
+                <label for="exportFormatSelect"><b>🎯 請選擇 LINE 上架管道方式：</b></label>
+                <select id="exportFormatSelect" class="export-select">
+                    <option value="apng">🖼️ APNG 動態檔 (適用：電腦版 Creators Market 網頁版)</option>
+                    <option value="sequence">📁 去背 PNG 影格資料夾 (適用：手機版 LINE 拍貼 App)</option>
+                </select>
+                <button class="btn" id="exportBtn" style="margin-top: 4px;" onclick="exportAllStickersZip()">📦 打包所有貼圖並下載 ZIP 檔案</button>
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-header">
+                    <span id="progressText">準備打包...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 手機優化版 Modal -->
+<div class="modal-overlay" id="editorModal">
+    <div class="editor-modal">
+        <div class="modal-header">
+            <span id="modalTitle">貼圖區域編修</span>
+            <span style="cursor:pointer; color:#94a3b8; font-size:1.2rem; padding:4px 8px;" onclick="closeModal()">✕</span>
+        </div>
+
+        <div class="modal-body">
+            <!-- 左側 / 上半部：畫布與控制 -->
+            <div class="preview-box-wrapper">
+                <div class="preview-box bg-dark" id="previewContainer">
+                    <div class="mode-badge" id="modeBadge">🪄 點擊去背模式</div>
+                    
+                    <div class="bg-toggles">
+                        <button class="bg-toggle-btn" onclick="setBg('light', this)">☀️</button>
+                        <button class="bg-toggle-btn active" onclick="setBg('dark', this)">🌙</button>
+                        <button class="bg-toggle-btn" onclick="setBg('grid', this)">🏁</button>
+                    </div>
+
+                    <div class="zoom-controls">
+                        <button class="btn-outline" style="min-height:28px; padding:2px 8px; background:rgba(15,23,42,0.8);" onclick="resetZoom()">100% 重置</button>
+                    </div>
+
+                    <canvas id="previewCanvas"></canvas>
+                </div>
+
+                <div class="edit-section">
+                    <div class="frame-stepper">
+                        <button class="step-btn" onclick="changeFrame(-1)">&lt; 上一幀</button>
+                        <span class="frame-indicator" id="frameDisplay">影格 1 / 20</span>
+                        <button class="step-btn" onclick="changeFrame(1)">下一幀 &gt;</button>
+                    </div>
+
+                    <div class="tool-row">
+                        <button class="btn-outline active" id="btnModeToggle" onclick="toggleInteractionMode()">🪄 點擊去背模式</button>
+                        <button class="btn-outline" id="btnPlay" onclick="togglePlay()">⊙ 播放預覽</button>
+                    </div>
+
+                    <div class="tool-row">
+                        <button class="btn-outline btn-danger" style="color:white;" onclick="deleteCurrentFrame()">🗑️ 刪除此影格</button>
+                        <button class="btn-outline" onclick="undoLastAction()">↺ 恢復上一步</button>
+                    </div>
+
+                    <div class="slider-item">
+                        <span>容許值</span>
+                        <input type="range" id="modalTolRange" min="5" max="120" value="30" oninput="document.getElementById('mTolVal').innerText=this.value;">
+                        <span id="mTolVal" style="width:24px;">30</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側 / 下半部：文字與樣式控制 -->
+            <div class="panel-controls">
+                <div class="form-group">
+                    <label class="form-label">✍️ 文字內容 (可於畫布拖曳位置)</label>
+                    <textarea class="text-input" id="textContent" placeholder="輸入貼圖文字..." oninput="updateCurrentTextConfig('text', this.value)"></textarea>
+                </div>
+
+                <div class="option-row">
+                    <div class="form-group">
+                        <label class="form-label">文字方向</label>
+                        <div class="segmented-control">
+                            <button class="segment-btn active" id="btnDirHoriz" onclick="setTextDir('horiz', this)">橫式</button>
+                            <button class="segment-btn" id="btnDirVert" onclick="setTextDir('vert', this)">直式</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">圖層順序</label>
+                        <div class="segmented-control">
+                            <button class="segment-btn active" id="btnLayerFront" onclick="setTextLayer('front', this)">前景</button>
+                            <button class="segment-btn" id="btnLayerBack" onclick="setTextLayer('back', this)">背景</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="option-row">
+                    <div class="form-group">
+                        <label class="form-label">字型</label>
+                        <select class="select-input" id="fontFamily" onchange="updateCurrentTextConfig('fontFamily', this.value)">
+                            <option value="sans-serif">Noto Sans TC</option>
+                            <option value="serif">明體 / PMingLiU</option>
+                            <option value="cursive">標楷體 / KAI</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">字體粗細</label>
+                        <select class="select-input" id="fontWeight" onchange="updateCurrentTextConfig('fontWeight', this.value)">
+                            <option value="bold">粗體 (700)</option>
+                            <option value="normal">一般 (400)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="slider-item" style="margin-top: 4px;">
+                    <span>字體大小</span>
+                    <input type="range" id="fontSize" min="12" max="60" value="26" oninput="updateCurrentTextConfig('fontSize', parseInt(this.value))">
+                </div>
+
+                <div class="option-row" style="margin-top: 4px;">
+                    <div class="slider-item">
+                        <span>文字顏色</span>
+                        <input type="color" id="textColor" value="#ffffff" onchange="updateCurrentTextConfig('textColor', this.value)" style="border:none; background:none; cursor:pointer;">
+                    </div>
+                    <div class="slider-item">
+                        <span>外框顏色</span>
+                        <input type="color" id="strokeColor" value="#000000" onchange="updateCurrentTextConfig('strokeColor', this.value)" style="border:none; background:none; cursor:pointer;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-bar">
+            <button class="btn-cancel" onclick="closeModal()">取消</button>
+            <button class="btn-main" onclick="saveModalChanges()">✓ 儲存修復</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // JS 核心邏輯保持與原功能完全一致[cite: 1]
+    const video = document.getElementById('mainVideo');
+    const overlay = document.getElementById('overlayCanvas');
+    const ctx = overlay.getContext('2d');
+    let videoWidth = 0, videoHeight = 0;
+
+    let cropBox = { left: 0, top: 0, right: 0, bottom: 0 };
+    let verticalLines = [];
+    let horizontalLines = [];
+    let draggingTarget = null;
+
+    let stickerDataMap = {}; 
+    let activeEditingStickerId = null;
+    let currentModalFrame = 0;
+    let isPlaying = false, playInterval = null;
+    let undoStack = [];
+
+    let isDraggingText = false;
+    let zoomScale = 1;
+    let panOffset = { x: 0, y: 0 };
+    let currentMode = 'wand'; 
+    let isPanning = false;
+    let startPan = { x: 0, y: 0 };
+    let initialPinchDistance = null;
+
+    function loadVideo(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        video.src = URL.createObjectURL(file);
+        video.onloadedmetadata = () => {
+            videoWidth = video.videoWidth; videoHeight = video.videoHeight;
+            overlay.width = videoWidth; overlay.height = videoHeight;
+            cropBox = { left: 20, top: 20, right: videoWidth - 20, bottom: videoHeight - 20 };
+            document.getElementById('editorCard').style.display = 'block';
+            video.play();
+            initGridLines();
+            setupDragEvents();
+        };
+    }
+
+    function initGridLines() {
+        const rows = parseInt(document.getElementById('gridRows').value);
+        const cols = parseInt(document.getElementById('gridCols').value);
+        if (!rows || !cols) return;
+        verticalLines = []; horizontalLines = [];
+        const activeW = cropBox.right - cropBox.left;
+        const activeH = cropBox.bottom - cropBox.top;
+        for (let i = 1; i < cols; i++) verticalLines.push(cropBox.left + (activeW / cols) * i);
+        for (let j = 1; j < rows; j++) horizontalLines.push(cropBox.top + (activeH / rows) * j);
+        drawGrid();
+    }
+
+    function autoDetectGrid() {
+        const rows = parseInt(document.getElementById('gridRows').value);
+        const cols = parseInt(document.getElementById('gridCols').value);
+        if (!rows || !cols) return;
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = videoWidth; tempCanvas.height = videoHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(video, 0, 0, videoWidth, videoHeight);
+        const imgData = tempCtx.getImageData(0, 0, videoWidth, videoHeight).data;
+
+        const targetColor = hexToRgb(document.getElementById('keyColor').value);
+        const tolerance = parseInt(document.getElementById('keyTolerance').value);
+
+        const xDensity = new Array(videoWidth).fill(0);
+        const yDensity = new Array(videoHeight).fill(0);
+
+        for (let y = 0; y < videoHeight; y += 2) {
+            for (let x = 0; x < videoWidth; x += 2) {
+                const i = (y * videoWidth + x) * 4;
+                const diff = Math.sqrt(Math.pow(imgData[i]-targetColor.r,2)+Math.pow(imgData[i+1]-targetColor.g,2)+Math.pow(imgData[i+2]-targetColor.b,2));
+                if (diff >= tolerance && imgData[i+3] >= 20) { xDensity[x]++; yDensity[y]++; }
+            }
+        }
+
+        let minX = xDensity.findIndex(v => v > 5), maxX = videoWidth - 1 - [...xDensity].reverse().findIndex(v => v > 5);
+        let minY = yDensity.findIndex(v => v > 5), maxY = videoHeight - 1 - [...yDensity].reverse().findIndex(v => v > 5);
+
+        if (minX !== -1 && maxX !== -1 && minY !== -1 && maxY !== -1) {
+            cropBox = { left: minX, top: minY, right: maxX, bottom: maxY };
+            verticalLines = findSplitLines(xDensity, minX, maxX, cols);
+            horizontalLines = findSplitLines(yDensity, minY, maxY, rows);
+            drawGrid();
+        }
+    }
+
+    function findSplitLines(densityArray, start, end, segments) {
+        const lines = []; const step = (end - start) / segments;
+        for (let i = 1; i < segments; i++) {
+            const expected = Math.floor(start + step * i);
+            const searchRange = Math.floor(step * 0.35);
+            let minDensity = Infinity, bestPos = expected;
+            for (let pos = expected - searchRange; pos <= expected + searchRange; pos++) {
+                if (pos >= 0 && pos < densityArray.length && densityArray[pos] < minDensity) {
+                    minDensity = densityArray[pos]; bestPos = pos;
+                }
+            }
+            lines.push(bestPos);
+        }
+        return lines;
+    }
+
+    function drawGrid() {
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        ctx.strokeStyle = '#818cf8'; ctx.setLineDash([6, 6]); ctx.lineWidth = 3;
+        ctx.strokeRect(cropBox.left, cropBox.top, cropBox.right - cropBox.left, cropBox.bottom - cropBox.top);
+        ctx.strokeStyle = '#38bdf8'; ctx.setLineDash([]); ctx.lineWidth = 2;
+        verticalLines.forEach(x => { ctx.beginPath(); ctx.moveTo(x, cropBox.top); ctx.lineTo(x, cropBox.bottom); ctx.stroke(); });
+        horizontalLines.forEach(y => { ctx.beginPath(); ctx.moveTo(cropBox.left, y); ctx.lineTo(cropBox.right, y); ctx.stroke(); });
+    }
+
+    function setupDragEvents() {
+        const getCanvasPos = (e) => {
+            const rect = overlay.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: (clientX - rect.left) * (videoWidth / rect.width), y: (clientY - rect.top) * (videoHeight / rect.height) };
+        };
+        const onStart = (e) => {
+            const { x, y } = getCanvasPos(e); const tol = 20;
+            if (Math.abs(x - cropBox.left) < tol) draggingTarget = { type: 'cropL' };
+            else if (Math.abs(x - cropBox.right) < tol) draggingTarget = { type: 'cropR' };
+            else if (Math.abs(y - cropBox.top) < tol) draggingTarget = { type: 'cropT' };
+            else if (Math.abs(y - cropBox.bottom) < tol) draggingTarget = { type: 'cropB' };
+            else {
+                for (let i = 0; i < verticalLines.length; i++) if (Math.abs(x - verticalLines[i]) < tol) { draggingTarget = { type: 'vLine', index: i }; return; }
+                for (let j = 0; j < horizontalLines.length; j++) if (Math.abs(y - horizontalLines[j]) < tol) { draggingTarget = { type: 'hLine', index: j }; return; }
+            }
+        };
+        const onMove = (e) => {
+            if (!draggingTarget) return;
+            const { x, y } = getCanvasPos(e);
+            if (draggingTarget.type === 'cropL') cropBox.left = Math.min(Math.max(0, x), cropBox.right - 20);
+            else if (draggingTarget.type === 'cropR') cropBox.right = Math.max(Math.min(videoWidth, x), cropBox.left + 20);
+            else if (draggingTarget.type === 'cropT') cropBox.top = Math.min(Math.max(0, y), cropBox.bottom - 20);
+            else if (draggingTarget.type === 'cropB') cropBox.bottom = Math.max(Math.min(videoHeight, y), cropBox.top + 20);
+            else if (draggingTarget.type === 'vLine') verticalLines[draggingTarget.index] = x;
+            else if (draggingTarget.type === 'hLine') horizontalLines[draggingTarget.index] = y;
+            drawGrid();
+        };
+        overlay.addEventListener('mousedown', onStart);
+        overlay.addEventListener('touchstart', onStart, {passive: true});
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, {passive: true});
+        window.addEventListener('mouseup', () => draggingTarget = null);
+        window.addEventListener('touchend', () => draggingTarget = null);
+    }
+
+    function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:255,g:255,b:255};
+    }
+
+    function seekToTime(t) {
+        return new Promise((resolve) => {
+            const onSeeked = () => { video.removeEventListener('seeked', onSeeked); resolve(); };
+            video.addEventListener('seeked', onSeeked);
+            video.currentTime = t;
+        });
+    }
+
+    async function extractAllStickers() {
+        const rows = parseInt(document.getElementById('gridRows').value);
+        const cols = parseInt(document.getElementById('gridCols').value);
+        if (!rows || !cols) return;
+
+        video.pause();
+        const duration = 2.0; 
+        const maxFrames = 20; 
+        const totalFrames = maxFrames;
+        const vBounds = [cropBox.left, ...verticalLines, cropBox.right];
+        const hBounds = [cropBox.top, ...horizontalLines, cropBox.bottom];
+
+        const enableKeying = document.getElementById('enableKeying').checked;
+        const targetColor = hexToRgb(document.getElementById('keyColor').value);
+        const tolerance = parseInt(document.getElementById('keyTolerance').value);
+
+        stickerDataMap = {};
+        document.getElementById('status').innerText = "⏳ 正在處理與分割貼圖...";
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const id = r * cols + c + 1;
+                const sx = Math.floor(vBounds[c]), sy = Math.floor(hBounds[r]);
+                const cellW = Math.floor(vBounds[c + 1] - vBounds[c]);
+                const cellH = Math.floor(hBounds[r + 1] - hBounds[r]);
+
+                const workCanvas = document.createElement('canvas');
+                workCanvas.width = cellW; workCanvas.height = cellH;
+                const workCtx = workCanvas.getContext('2d');
+
+                const frames = []; const masks = [];
+
+                for (let f = 0; f < totalFrames; f++) {
+                    const timePoint = (f / totalFrames) * duration;
+                    await seekToTime(timePoint);
+                    workCtx.clearRect(0, 0, cellW, cellH);
+                    workCtx.drawImage(video, sx, sy, cellW, cellH, 0, 0, cellW, cellH);
+                    const imgData = workCtx.getImageData(0, 0, cellW, cellH);
+                    
+                    const mask = new Uint8Array(cellW * cellH);
+                    if (enableKeying) {
+                        applyInitialKeying(imgData, mask, targetColor, tolerance);
+                    }
+                    frames.push(imgData);
+                    masks.push(mask);
+                }
+
+                stickerDataMap[id] = { 
+                    frames, 
+                    masks, 
+                    textConfig: {
+                        text: '',
+                        dir: 'horiz',
+                        layer: 'front',
+                        fontFamily: 'sans-serif',
+                        fontWeight: 'bold',
+                        fontSize: 26,
+                        textColor: '#ffffff',
+                        strokeColor: '#000000',
+                        x: cellW / 2,
+                        y: cellH - 25
+                    }
+                };
+            }
+        }
+
+        document.getElementById('status').innerText = "✅ 貼圖拆分完成！";
+        renderStickerCards();
+    }
+
+    function applyInitialKeying(imgData, mask, targetColor, tolerance) {
+        const data = imgData.data, w = imgData.width, h = imgData.height;
+        const queue = []; const visited = new Uint8Array(w * h);
+        for (let x = 0; x < w; x++) { queue.push(x, 0); queue.push(x, h - 1); }
+        for (let y = 1; y < h - 1; y++) { queue.push(0, y); queue.push(w - 1, y); }
+
+        const tR = targetColor.r, tG = targetColor.g, tB = targetColor.b;
+        const tolSq = tolerance * tolerance * 3;
+
+        let head = 0;
+        while (head < queue.length) {
+            const x = queue[head++], y = queue[head++];
+            const idx = y * w + x;
+            if (visited[idx]) continue;
+            visited[idx] = 1;
+
+            const pxIdx = idx * 4;
+            const dr = data[pxIdx] - tR, dg = data[pxIdx+1] - tG, db = data[pxIdx+2] - tB;
+            if (dr*dr + dg*dg + db*db <= tolSq) {
+                mask[idx] = 1;
+                if (x > 0 && !visited[idx - 1]) queue.push(x - 1, y);
+                if (x < w - 1) queue.push(x + 1, y);
+                if (y > 0 && !visited[idx - w]) queue.push(x, y - 1);
+                if (y < h - 1) queue.push(x, y + w);
+            }
+        }
+    }
+
+    function renderStickerCards() {
+        const grid = document.getElementById('stickersGrid');
+        grid.innerHTML = '';
+        document.getElementById('stickersListSection').style.display = 'block';
+
+        Object.keys(stickerDataMap).forEach(id => {
+            const data = stickerDataMap[id];
+            const card = document.createElement('div');
+            card.className = 'sticker-card';
+
+            const pCanvas = document.createElement('canvas');
+            const frame0 = data.frames[0];
+            pCanvas.width = frame0.width; pCanvas.height = frame0.height;
+            const pCtx = pCanvas.getContext('2d');
+            
+            renderSingleFrameToCanvas(pCtx, data, 0);
+
+            card.innerHTML = `
+                <b style="font-size:0.9rem;">貼圖 #${id} (${data.frames.length} 幀)</b>
+                <img class="sticker-preview" src="${pCanvas.toDataURL()}">
+                <button class="btn btn-sec" style="padding:6px 12px; font-size:0.85rem; margin-top:2px;" onclick="openInspectorModal('${id}')">🔍 進入編輯</button>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    function openInspectorModal(id) {
+        activeEditingStickerId = id;
+        currentModalFrame = 0;
+        undoStack = [];
+        
+        syncUIWithStickerTextConfig(stickerDataMap[id].textConfig);
+
+        document.getElementById('modalTitle').innerText = `編輯貼圖 #${id}`;
+        document.getElementById('editorModal').style.display = 'flex';
+        resetZoom();
+        renderModalFrame();
+        setupInteractiveCanvas();
+    }
+
+    function syncUIWithStickerTextConfig(cfg) {
+        document.getElementById('textContent').value = cfg.text || '';
+        document.getElementById('fontFamily').value = cfg.fontFamily;
+        document.getElementById('fontWeight').value = cfg.fontWeight;
+        document.getElementById('fontSize').value = cfg.fontSize;
+        document.getElementById('textColor').value = cfg.textColor;
+        document.getElementById('strokeColor').value = cfg.strokeColor;
+
+        updateSegmentUI('btnDirHoriz', 'btnDirVert', cfg.dir === 'horiz');
+        updateSegmentUI('btnLayerFront', 'btnLayerBack', cfg.layer === 'front');
+    }
+
+    function updateSegmentUI(id1, id2, isFirstActive) {
+        const b1 = document.getElementById(id1);
+        const b2 = document.getElementById(id2);
+        if (isFirstActive) {
+            b1.classList.add('active'); b2.classList.remove('active');
+        } else {
+            b2.classList.add('active'); b1.classList.remove('active');
+        }
+    }
+
+    function updateCurrentTextConfig(key, value) {
+        const sticker = stickerDataMap[activeEditingStickerId];
+        if (sticker) {
+            sticker.textConfig[key] = value;
+            renderModalFrame();
+        }
+    }
+
+    function closeModal() {
+        if (isPlaying) togglePlay();
+        document.getElementById('editorModal').style.display = 'none';
+    }
+
+    function changeFrame(delta) {
+        if (isPlaying) togglePlay();
+        const frames = stickerDataMap[activeEditingStickerId].frames;
+        if (!frames.length) return;
+        currentModalFrame = (currentModalFrame + delta + frames.length) % frames.length;
+        renderModalFrame();
+    }
+
+    function deleteCurrentFrame() {
+        const sticker = stickerDataMap[activeEditingStickerId];
+        if (!sticker || sticker.frames.length <= 1) {
+            alert('⚠️ 至少需要保留 1 個影格，無法繼續刪除！');
+            return;
+        }
+
+        if (isPlaying) togglePlay();
+
+        undoStack.push({
+            type: 'delete',
+            frameIndex: currentModalFrame,
+            frameData: sticker.frames[currentModalFrame],
+            maskData: sticker.masks[currentModalFrame]
+        });
+
+        sticker.frames.splice(currentModalFrame, 1);
+        sticker.masks.splice(currentModalFrame, 1);
+
+        if (currentModalFrame >= sticker.frames.length) {
+            currentModalFrame = sticker.frames.length - 1;
+        }
+
+        renderModalFrame();
+    }
+
+    function undoLastAction() {
+        if (!undoStack.length) return;
+        const last = undoStack.pop();
+        const sticker = stickerDataMap[activeEditingStickerId];
+
+        if (last.type === 'delete') {
+            sticker.frames.splice(last.frameIndex, 0, last.frameData);
+            sticker.masks.splice(last.frameIndex, 0, last.maskData);
+            currentModalFrame = last.frameIndex;
+        } else if (last.type === 'wand') {
+            sticker.masks[last.frameIndex] = last.maskCopy;
+        }
+        renderModalFrame();
+    }
+
+    function togglePlay() {
+        isPlaying = !isPlaying;
+        const btn = document.getElementById('btnPlay');
+        const frames = stickerDataMap[activeEditingStickerId].frames;
+        if (isPlaying) {
+            btn.innerText = "⏸ 暫停預覽";
+            playInterval = setInterval(() => {
+                currentModalFrame = (currentModalFrame + 1) % frames.length;
+                renderModalFrame();
+            }, 1000 / 15);
+        } else {
+            btn.innerText = "⊙ 播放預覽";
+            clearInterval(playInterval);
+        }
+    }
+
+    function renderModalFrame() {
+        const sticker = stickerDataMap[activeEditingStickerId];
+        if (!sticker || !sticker.frames.length) return;
+
+        const imgData = sticker.frames[currentModalFrame];
+        const w = imgData.width, h = imgData.height;
+
+        const canvas = document.getElementById('previewCanvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+
+        renderSingleFrameToCanvas(ctx, sticker, currentModalFrame);
+
+        document.getElementById('frameDisplay').innerText = `影格 ${currentModalFrame + 1} / ${sticker.frames.length}`;
+        updateCanvasTransform();
+    }
+
+    function renderSingleFrameToCanvas(ctx, stickerData, frameIdx) {
+        const imgData = stickerData.frames[frameIdx];
+        const mask = stickerData.masks[frameIdx];
+        const cfg = stickerData.textConfig;
+        const w = imgData.width, h = imgData.height;
+
+        const outImgData = ctx.createImageData(w, h);
+        const sPx = imgData.data, oPx = outImgData.data;
+
+        for (let i = 0; i < sPx.length; i += 4) {
+            const idx = i / 4;
+            oPx[i] = sPx[i]; oPx[i+1] = sPx[i+1]; oPx[i+2] = sPx[i+2];
+            oPx[i+3] = (mask[idx] === 1) ? 0 : sPx[i+3];
+        }
+
+        ctx.clearRect(0, 0, w, h);
+
+        if (cfg.layer === 'back') drawStickerText(ctx, cfg);
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w; tempCanvas.height = h;
+        tempCanvas.getContext('2d').putImageData(outImgData, 0, 0);
+        ctx.drawImage(tempCanvas, 0, 0);
+
+        if (cfg.layer === 'front') drawStickerText(ctx, cfg);
+    }
+
+    function drawStickerText(ctx, cfg) {
+        if (!cfg || !cfg.text) return;
+
+        ctx.font = `${cfg.fontWeight} ${cfg.fontSize}px ${cfg.fontFamily}`;
+        ctx.fillStyle = cfg.textColor;
+        ctx.strokeStyle = cfg.strokeColor;
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        if (cfg.dir === 'horiz') {
+            ctx.strokeText(cfg.text, cfg.x, cfg.y);
+            ctx.fillText(cfg.text, cfg.x, cfg.y);
+        } else {
+            const chars = cfg.text.split('');
+            const lineH = cfg.fontSize * 1.1;
+            const startY = cfg.y - ((chars.length - 1) * lineH) / 2;
+            chars.forEach((ch, idx) => {
+                ctx.strokeText(ch, cfg.x, startY + idx * lineH);
+                ctx.fillText(ch, cfg.x, startY + idx * lineH);
+            });
+        }
+    }
+
+    function getExactCanvasCoords(clientX, clientY) {
+        const canvas = document.getElementById('previewCanvas');
+        const rect = canvas.getBoundingClientRect();
+        
+        const relX = (clientX - rect.left) / rect.width;
+        const relY = (clientY - rect.top) / rect.height;
+
+        return {
+            x: Math.floor(relX * canvas.width),
+            y: Math.floor(relY * canvas.height)
+        };
+    }
+
+    function setupInteractiveCanvas() {
+        const container = document.getElementById('previewContainer');
+
+        const handleStart = (e) => {
+            if (e.touches && e.touches.length === 2) {
+                initialPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                return;
+            }
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const p = getExactCanvasCoords(clientX, clientY);
+
+            const sticker = stickerDataMap[activeEditingStickerId];
+            const cfg = sticker.textConfig;
+
+            if (cfg.text) {
+                const distToText = Math.hypot(p.x - cfg.x, p.y - cfg.y);
+                if (distToText < 35) {
+                    isDraggingText = true;
+                    return;
+                }
+            }
+
+            if (currentMode === 'pan') {
+                isPanning = true;
+                startPan = { x: clientX - panOffset.x, y: clientY - panOffset.y };
+            } else if (currentMode === 'wand') {
+                executeMagicWand(p.x, p.y);
+            }
+        };
+
+        const handleMove = (e) => {
+            if (e.touches && e.touches.length === 2 && initialPinchDistance) {
+                const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const factor = dist / initialPinchDistance;
+                zoomScale = Math.min(Math.max(0.8, zoomScale * factor), 5);
+                initialPinchDistance = dist;
+                updateCanvasTransform();
+                return;
+            }
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            if (isDraggingText) {
+                const p = getExactCanvasCoords(clientX, clientY);
+                const sticker = stickerDataMap[activeEditingStickerId];
+                sticker.textConfig.x = p.x;
+                sticker.textConfig.y = p.y;
+                renderModalFrame();
+            } else if (isPanning) {
+                panOffset.x = clientX - startPan.x;
+                panOffset.y = clientY - startPan.y;
+                updateCanvasTransform();
+            }
+        };
+
+        const handleEnd = () => {
+            isDraggingText = false;
+            isPanning = false;
+            initialPinchDistance = null;
+        };
+
+        container.onmousedown = handleStart;
+        window.onmousemove = handleMove;
+        window.onmouseup = handleEnd;
+
+        container.ontouchstart = handleStart;
+        window.ontouchmove = handleMove;
+        window.ontouchend = handleEnd;
+
+        container.onwheel = (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            zoomScale = Math.min(Math.max(0.8, zoomScale * zoomFactor), 5);
+            updateCanvasTransform();
+        };
+    }
+
+    function toggleInteractionMode() {
+        const btn = document.getElementById('btnModeToggle');
+        const badge = document.getElementById('modeBadge');
+        if (currentMode === 'wand') {
+            currentMode = 'pan';
+            btn.innerText = "🖐️ 畫布平移模式";
+            btn.classList.remove('active');
+            badge.innerText = "🖐️ 畫布拖曳/縮放模式";
+        } else {
+            currentMode = 'wand';
+            btn.innerText = "🪄 點擊去背模式";
+            btn.classList.add('active');
+            badge.innerText = "🪄 點擊去背模式";
+        }
+    }
+
+    function updateCanvasTransform() {
+        const canvas = document.getElementById('previewCanvas');
+        canvas.style.transform = `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`;
+    }
+
+    function resetZoom() {
+        zoomScale = 1;
+        panOffset = { x: 0, y: 0 };
+        updateCanvasTransform();
+    }
+
+    function executeMagicWand(clickX, clickY) {
+        const sticker = stickerDataMap[activeEditingStickerId];
+        const imgData = sticker.frames[currentModalFrame];
+        const mask = sticker.masks[currentModalFrame];
+        const w = imgData.width, h = imgData.height;
+
+        if (clickX < 0 || clickX >= w || clickY < 0 || clickY >= h) return;
+
+        undoStack.push({ type: 'wand', frameIndex: currentModalFrame, maskCopy: new Uint8Array(mask) });
+
+        const startIdx = (clickY * w + clickX) * 4;
+        const tR = imgData.data[startIdx], tG = imgData.data[startIdx+1], tB = imgData.data[startIdx+2];
+        const tol = parseInt(document.getElementById('modalTolRange').value);
+        const tolSq = tol * tol * 3;
+
+        const queue = [clickX, clickY];
+        const visited = new Uint8Array(w * h);
+
+        while (queue.length > 0) {
+            const y = queue.pop(), x = queue.pop();
+            const idx = y * w + x;
+            if (visited[idx]) continue;
+            visited[idx] = 1;
+
+            const pxIdx = idx * 4;
+            const dr = imgData.data[pxIdx] - tR, dg = imgData.data[pxIdx+1] - tG, db = imgData.data[pxIdx+2] - tB;
+
+            if (dr*dr + dg*dg + db*db <= tolSq) {
+                mask[idx] = 1;
+                if (x > 0) queue.push(x - 1, y);
+                if (x < w - 1) queue.push(x + 1, y);
+                if (y > 0) queue.push(x, y - 1);
+                if (y < h - 1) queue.push(x, y + 1);
+            }
+        }
+
+        renderModalFrame();
+    }
+
+    function setBg(type, btn) {
+        document.getElementById('previewContainer').className = `preview-box bg-${type}`;
+        document.querySelectorAll('.bg-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    function setTextLayer(pos, btn) {
+        updateCurrentTextConfig('layer', pos);
+        updateSegmentUI('btnLayerFront', 'btnLayerBack', pos === 'front');
+    }
+
+    function setTextDir(dir, btn) {
+        updateCurrentTextConfig('dir', dir);
+        updateSegmentUI('btnDirHoriz', 'btnDirVert', dir === 'horiz');
+    }
+
+    function saveModalChanges() {
+        closeModal();
+        renderStickerCards();
+    }
+
+    async function exportAllStickersZip() {
+        const exportBtn = document.getElementById('exportBtn');
+        const formatMode = document.getElementById('exportFormatSelect').value;
+        const progressContainer = document.getElementById('progressContainer');
+        const progressText = document.getElementById('progressText');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressBarFill = document.getElementById('progressBarFill');
+        
+        try {
+            exportBtn.disabled = true;
+            progressContainer.style.display = 'block';
+            
+            const updateProgress = (text, percent) => {
+                progressText.innerText = text;
+                progressPercent.innerText = `${percent}%`;
+                progressBarFill.style.width = `${percent}%`;
+            };
+
+            updateProgress("準備生成打包檔...", 0);
+
+            const zip = new JSZip();
+            const fps = 15;
+            const stickerIds = Object.keys(stickerDataMap);
+            const totalStickers = stickerIds.length;
+
+            for (let idx = 0; idx < totalStickers; idx++) {
+                const id = stickerIds[idx];
+                const currentPercent = Math.floor((idx / totalStickers) * 80);
+                updateProgress(`正在處理貼圖 #${id}...`, currentPercent);
+
+                await new Promise(r => setTimeout(r, 20));
+
+                const sticker = stickerDataMap[id];
+                const cellW = sticker.frames[0].width;
+                const cellH = sticker.frames[0].height;
+
+                const c = document.createElement('canvas');
+                c.width = cellW; c.height = cellH;
+                const cCtx = c.getContext('2d');
+
+                if (formatMode === 'apng') {
+                    const framesArray = [];
+                    const delaysArray = [];
+
+                    for (let f = 0; f < sticker.frames.length; f++) {
+                        cCtx.clearRect(0, 0, cellW, cellH);
+                        renderSingleFrameToCanvas(cCtx, sticker, f);
+
+                        const finalData = cCtx.getImageData(0, 0, cellW, cellH);
+                        framesArray.push(new Uint8Array(finalData.data.buffer).buffer);
+                        delaysArray.push(Math.floor(1000 / fps));
+                    }
+
+                    const apngBuffer = UPNG.encode(framesArray, cellW, cellH, 0, delaysArray);
+                    zip.file(`sticker_${id}.png`, apngBuffer);
+
+                } else {
+                    const stickerFolder = zip.folder(`sticker_${id}_frames`);
+
+                    for (let f = 0; f < sticker.frames.length; f++) {
+                        cCtx.clearRect(0, 0, cellW, cellH);
+                        renderSingleFrameToCanvas(cCtx, sticker, f);
+
+                        const frameNum = String(f + 1).padStart(2, '0');
+                        const dataUrl = c.toDataURL('image/png');
+                        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+                        stickerFolder.file(`frame_${frameNum}.png`, base64Data, { base64: true });
+                    }
+                }
+            }
+
+            updateProgress("正在打包 ZIP...", 90);
+            const blob = await zip.generateAsync({ type: "blob" });
+
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `LINE_stickers_${formatMode}_pack.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            setTimeout(() => { progressContainer.style.display = 'none'; }, 2000);
+
+        } catch (err) {
+            console.error(err);
+            progressText.innerText = "❌ 打包失敗: " + err.message;
+            progressBarFill.style.background = "#ef4444";
+        } finally {
+            exportBtn.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>
