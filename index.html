@@ -191,6 +191,19 @@
             </div>
 
             <div class="control-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
+                <h4>擷取秒數 / 幀數設定</h4>
+                <div class="slider-item">
+                    <span>擷取長度 (秒):</span>
+                    <input type="number" id="captureDuration" class="grid-input" style="width:80px;" min="0.1" step="0.1" placeholder="整支影片" oninput="updateCaptureDurationHint()">
+                </div>
+                <div class="slider-item">
+                    <span>總幀數:</span>
+                    <input type="number" id="frameCountInput" class="grid-input" style="width:70px;" min="2" max="120" step="1" value="40" oninput="updateCaptureDurationHint()">
+                    <span id="captureDurationHint" style="font-size:0.75rem; color:var(--text-muted);"></span>
+                </div>
+            </div>
+
+            <div class="control-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="checkbox" id="enableKeying" checked onchange="drawGrid()" style="width:20px; height:20px;">
                     <label for="enableKeying" style="font-size:0.85rem;"><b>開啟漫水去背</b></label>
@@ -206,7 +219,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
             <button class="btn btn-auto" onclick="autoDetectGrid()">✨ 自動定位分割線</button>
-            <button class="btn btn-sec" onclick="extractAllStickers()">✂️ 拆分貼圖 (限制 20 幀)</button>
+            <button class="btn btn-sec" onclick="extractAllStickers()">✂️ 拆分貼圖</button>
         </div>
         <div id="status"></div>
 
@@ -258,6 +271,7 @@
         <div class="preview-box-wrapper">
             <div class="preview-box bg-dark" id="previewContainer">
                 <div class="mode-badge" id="modeBadge">🪄 點擊去背</div>
+                <div id="boxSelectOverlay" style="position:absolute; display:none; border:2px dashed #38bdf8; background:rgba(56,189,248,0.18); pointer-events:none; z-index:5;"></div>
                 
                 <div class="bg-toggles">
                     <button class="bg-toggle-btn" onclick="setBg('light', this)">☀️</button>
@@ -274,7 +288,7 @@
             <div class="panel-section-title">🎬 影格播放控制</div>
             <div class="frame-stepper">
                 <button class="step-btn" onclick="changeFrame(-1)">&lt; 上一幀</button>
-                <span class="frame-indicator" id="frameDisplay">影格 1 / 20</span>
+                <span class="frame-indicator" id="frameDisplay">影格 1 / -</span>
                 <button class="step-btn" onclick="changeFrame(1)">下一幀 &gt;</button>
             </div>
 
@@ -292,6 +306,11 @@
                 <span style="font-size:0.8rem;">容許值</span>
                 <input type="range" id="modalTolRange" min="5" max="120" value="30" oninput="document.getElementById('mTolVal').innerText=this.value;">
                 <span id="mTolVal" style="width:24px; font-size:0.8rem;">30</span>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="boxInverseMode" style="width:18px; height:18px;">
+                <label for="boxInverseMode" style="font-size:0.8rem;">框選還原（取消去背，找回被吃掉的主體）</label>
             </div>
         </div>
 
@@ -384,6 +403,9 @@
     let isPanning = false;
     let startPan = { x: 0, y: 0 };
     let initialPinchDistance = null;
+    let boxSelecting = false;
+    let boxSelectStartClient = null;
+    let boxSelectCurrentClient = null;
 
     function switchTab(tab) {
         document.getElementById('tabBtnPreview').classList.toggle('active', tab === 'preview');
@@ -401,6 +423,16 @@
             overlay.width = videoWidth; overlay.height = videoHeight;
             cropBox = { left: 0, top: 0, right: videoWidth, bottom: videoHeight };
             document.getElementById('editorCard').style.display = 'block';
+
+            // Default the capture-duration field to the video's real length so the
+            // extraction covers the whole clip instead of being silently cut short.
+            const capInput = document.getElementById('captureDuration');
+            if (isFinite(video.duration) && video.duration > 0) {
+                capInput.value = video.duration.toFixed(2);
+                capInput.placeholder = '';
+            }
+            updateCaptureDurationHint();
+
             video.play();
             initGridLines();
             setupDragEvents();
@@ -530,10 +562,63 @@
 
     function seekToTime(t) {
         return new Promise((resolve) => {
+            const target = Math.min(t, Math.max(0, (video.duration || t) - 0.02));
+            // If we're already essentially at this time, 'seeked' may never fire —
+            // resolve on the next frame instead of hanging forever.
+            if (Math.abs(video.currentTime - target) < 0.005) {
+                requestAnimationFrame(() => resolve());
+                return;
+            }
             const onSeeked = () => { video.removeEventListener('seeked', onSeeked); resolve(); };
             video.addEventListener('seeked', onSeeked);
-            video.currentTime = t;
+            video.currentTime = target;
         });
+    }
+
+    // Real usable duration of the loaded clip. Respects the "擷取長度" field the user can
+    // edit; if left blank it falls back to the full video length. Previously this was
+    // hardcoded to 2.0s, which silently truncated any longer video.
+    function getEffectiveDuration() {
+        const vd = video.duration;
+        const capInput = document.getElementById('captureDuration');
+        const userValue = capInput && capInput.value !== '' ? parseFloat(capInput.value) : null;
+
+        if (userValue && userValue > 0.05) {
+            return isFinite(vd) && vd > 0.05 ? Math.min(vd, userValue) : userValue;
+        }
+        if (isFinite(vd) && vd > 0.05) return vd;
+        return 2.0;
+    }
+
+    function getFrameCount() {
+        const input = document.getElementById('frameCountInput');
+        const v = input ? parseInt(input.value) : NaN;
+        if (!v || v < 2) return 40;
+        return Math.min(v, 120); // sane ceiling to avoid runaway memory/export time
+    }
+
+    function updateCaptureDurationHint() {
+        const hint = document.getElementById('captureDurationHint');
+        const maxFrames = getFrameCount();
+        const duration = getEffectiveDuration();
+        if (!hint || !duration) return;
+        const fps = (maxFrames / duration).toFixed(1);
+        hint.innerText = `≈ ${fps} fps (${maxFrames} 幀 / ${duration.toFixed(2)} 秒)`;
+    }
+
+    // Cheap perceptual check for "these two frames are basically identical" — used to
+    // detect/avoid duplicate frames caused by seeking to two time points that land on
+    // the same decoded video frame.
+    function framesLookIdentical(a, b) {
+        if (!a || !b || a.data.length !== b.data.length) return false;
+        const data1 = a.data, data2 = b.data;
+        const step = 4 * 23; // sample every ~23rd pixel, cheap but representative
+        let diffSum = 0, samples = 0;
+        for (let i = 0; i < data1.length; i += step) {
+            diffSum += Math.abs(data1[i] - data2[i]) + Math.abs(data1[i + 1] - data2[i + 1]) + Math.abs(data1[i + 2] - data2[i + 2]);
+            samples++;
+        }
+        return samples > 0 && (diffSum / samples) < 3; // near-zero average channel difference
     }
 
     async function extractAllStickers() {
@@ -542,8 +627,8 @@
         if (!rows || !cols) return;
 
         video.pause();
-        const duration = 2.0; 
-        const maxFrames = 20; 
+        const duration = getEffectiveDuration();
+        const maxFrames = getFrameCount(); 
         const totalFrames = maxFrames;
         const vBounds = [cropBox.left, ...verticalLines, cropBox.right];
         const hBounds = [cropBox.top, ...horizontalLines, cropBox.bottom];
@@ -567,13 +652,26 @@
                 const workCtx = workCanvas.getContext('2d');
 
                 const frames = []; const masks = [];
+                const frameStep = duration / totalFrames;
+                const frameDelayMs = frameStep * 1000;
 
                 for (let f = 0; f < totalFrames; f++) {
-                    const timePoint = (f / totalFrames) * duration;
+                    let timePoint = f * frameStep;
                     await seekToTime(timePoint);
                     workCtx.clearRect(0, 0, cellW, cellH);
                     workCtx.drawImage(video, sx, sy, cellW, cellH, 0, 0, cellW, cellH);
-                    const imgData = workCtx.getImageData(0, 0, cellW, cellH);
+                    let imgData = workCtx.getImageData(0, 0, cellW, cellH);
+
+                    // If this frame is basically identical to the one right before it
+                    // (happens when the requested time points land on the same decoded
+                    // video frame), nudge forward and re-sample instead of keeping the dupe.
+                    if (frames.length > 0 && framesLookIdentical(frames[frames.length - 1], imgData)) {
+                        const nudged = Math.min(duration - 0.01, timePoint + frameStep * 0.6);
+                        await seekToTime(nudged);
+                        workCtx.clearRect(0, 0, cellW, cellH);
+                        workCtx.drawImage(video, sx, sy, cellW, cellH, 0, 0, cellW, cellH);
+                        imgData = workCtx.getImageData(0, 0, cellW, cellH);
+                    }
                     
                     const mask = new Uint8Array(cellW * cellH);
                     if (enableKeying) {
@@ -586,6 +684,7 @@
                 stickerDataMap[id] = { 
                     frames, 
                     masks, 
+                    frameDelayMs,
                     textConfig: {
                         text: '',
                         dir: 'horiz',
@@ -606,9 +705,53 @@
         renderStickerCards();
     }
 
+    // mask[] now stores a continuous 0-255 "how much this pixel is background" value
+    // instead of a hard 0/1 flag. 0 = fully keep, 255 = fully remove, values in between
+    // give a smooth, anti-aliased edge.
     function applyInitialKeying(imgData, mask, targetColor, tolerance) {
         const data = imgData.data, w = imgData.width, h = imgData.height;
-        const queue = []; const visited = new Uint8Array(w * h);
+
+        // Step 1: find the DEFINITE background using a stricter (tighter) tolerance than
+        // the user's slider. This is what actually stops the flood fill from tunnelling
+        // deep into the subject through pixels that happen to be close to the key color —
+        // previously the full (looser) tolerance was used for the entire flood fill.
+        const innerTol = tolerance * 0.65;
+        const bgMask = floodFillBackground(data, w, h, targetColor, innerTol);
+
+        // Step 2: soft-edge the boundary. Crucially this ramp is only ever applied to
+        // pixels that directly touch a background pixel — it can never reach further
+        // into the subject than 1px, no matter how loose "tolerance" is set.
+        const tR = targetColor.r, tG = targetColor.g, tB = targetColor.b;
+        const outerTol = tolerance;
+
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const idx = y * w + x;
+                if (bgMask[idx]) { mask[idx] = 255; continue; }
+                if (!isAdjacentToBackground(bgMask, w, h, x, y)) continue;
+
+                const pxIdx = idx * 4;
+                const dr = data[pxIdx] - tR, dg = data[pxIdx + 1] - tG, db = data[pxIdx + 2] - tB;
+                const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+
+                if (dist <= innerTol) {
+                    mask[idx] = 255;
+                } else if (dist < outerTol) {
+                    const t = (dist - innerTol) / (outerTol - innerTol);
+                    mask[idx] = Math.round((1 - t) * 255); // smooth ramp instead of a hard cut
+                }
+            }
+        }
+
+        // Step 3: despill — pull the color of partially-removed edge pixels away from the
+        // key color, so no green/white halo is left once composited onto a new background.
+        despillEdges(data, mask, w, h, targetColor);
+    }
+
+    function floodFillBackground(data, w, h, targetColor, tolerance) {
+        const bgMask = new Uint8Array(w * h);
+        const visited = new Uint8Array(w * h);
+        const queue = [];
         for (let x = 0; x < w; x++) { queue.push(x, 0); queue.push(x, h - 1); }
         for (let y = 1; y < h - 1; y++) { queue.push(0, y); queue.push(w - 1, y); }
 
@@ -623,14 +766,43 @@
             visited[idx] = 1;
 
             const pxIdx = idx * 4;
-            const dr = data[pxIdx] - tR, dg = data[pxIdx+1] - tG, db = data[pxIdx+2] - tB;
-            if (dr*dr + dg*dg + db*db <= tolSq) {
-                mask[idx] = 1;
+            const dr = data[pxIdx] - tR, dg = data[pxIdx + 1] - tG, db = data[pxIdx + 2] - tB;
+            if (dr * dr + dg * dg + db * db <= tolSq) {
+                bgMask[idx] = 1;
                 if (x > 0 && !visited[idx - 1]) queue.push(x - 1, y);
-                if (x < w - 1) queue.push(x + 1, y);
+                if (x < w - 1 && !visited[idx + 1]) queue.push(x + 1, y);
                 if (y > 0 && !visited[idx - w]) queue.push(x, y - 1);
-                if (y < h - 1) queue.push(x, y + w);
+                // BUG FIX: this used to be `queue.push(x, y + w)`, which pushed a
+                // y-coordinate offset by the image WIDTH instead of by 1. That silently
+                // broke downward flood-fill propagation, leaving ragged, incompletely
+                // keyed pixels behind — i.e. the fringing/毛邊.
+                if (y < h - 1 && !visited[idx + w]) queue.push(x, y + 1);
             }
+        }
+        return bgMask;
+    }
+
+    function isAdjacentToBackground(bgMask, w, h, x, y) {
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                if (bgMask[ny * w + nx]) return true;
+            }
+        }
+        return false;
+    }
+
+    function despillEdges(data, mask, w, h, targetColor) {
+        const tR = targetColor.r, tG = targetColor.g, tB = targetColor.b;
+        for (let idx = 0; idx < mask.length; idx++) {
+            const a = mask[idx];
+            if (a === 0 || a === 255) continue; // only correct partially-transparent edge pixels
+            const pxIdx = idx * 4;
+            const spill = a / 255;
+            data[pxIdx]     -= (tR - data[pxIdx])     * spill * 0.35;
+            data[pxIdx + 1] -= (tG - data[pxIdx + 1]) * spill * 0.35;
+            data[pxIdx + 2] -= (tB - data[pxIdx + 2]) * spill * 0.35;
         }
     }
 
@@ -671,6 +843,9 @@
         document.getElementById('editorModal').style.display = 'flex';
         switchTab('preview');
         resetZoom();
+        boxSelecting = false;
+        const boxOverlay = document.getElementById('boxSelectOverlay');
+        if (boxOverlay) boxOverlay.style.display = 'none';
         renderModalFrame();
         setupInteractiveCanvas();
     }
@@ -753,7 +928,7 @@
             sticker.frames.splice(last.frameIndex, 0, last.frameData);
             sticker.masks.splice(last.frameIndex, 0, last.maskData);
             currentModalFrame = last.frameIndex;
-        } else if (last.type === 'wand') {
+        } else if (last.type === 'wand' || last.type === 'box') {
             sticker.masks[last.frameIndex] = last.maskCopy;
         }
         renderModalFrame();
@@ -762,13 +937,15 @@
     function togglePlay() {
         isPlaying = !isPlaying;
         const btn = document.getElementById('btnPlay');
-        const frames = stickerDataMap[activeEditingStickerId].frames;
+        const sticker = stickerDataMap[activeEditingStickerId];
+        const frames = sticker.frames;
         if (isPlaying) {
             btn.innerText = "⏸ 暫停預覽";
+            const delay = sticker.frameDelayMs || (1000 / 15);
             playInterval = setInterval(() => {
                 currentModalFrame = (currentModalFrame + 1) % frames.length;
                 renderModalFrame();
-            }, 1000 / 15);
+            }, delay);
         } else {
             btn.innerText = "⊙ 播放預覽";
             clearInterval(playInterval);
@@ -842,7 +1019,8 @@
         for (let i = 0; i < sPx.length; i += 4) {
             const idx = i / 4;
             oPx[i] = sPx[i]; oPx[i+1] = sPx[i+1]; oPx[i+2] = sPx[i+2];
-            oPx[i+3] = (mask[idx] === 1) ? 0 : sPx[i+3];
+            // mask[idx] is 0-255 "how much background" — blend instead of a hard cut.
+            oPx[i+3] = Math.round(sPx[i+3] * (1 - mask[idx] / 255));
         }
 
         ctx.clearRect(0, 0, w, h);
@@ -884,12 +1062,14 @@
 
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            const p = getExactCanvasCoords(clientX, clientY);
 
             const sticker = stickerDataMap[activeEditingStickerId];
             const cfg = sticker.textConfig;
 
-            if (cfg.text) {
+            // Box-select drags a rectangle across the canvas — skip the "drag the text"
+            // shortcut here so a drag starting near the text doesn't get hijacked.
+            if (currentMode !== 'box' && cfg.text) {
+                const p = getExactCanvasCoords(clientX, clientY);
                 const distToText = Math.hypot(p.x - cfg.x, p.y - cfg.y);
                 if (distToText < 35) {
                     isDraggingText = true;
@@ -901,7 +1081,15 @@
                 isPanning = true;
                 startPan = { x: clientX - panOffset.x, y: clientY - panOffset.y };
             } else if (currentMode === 'wand') {
+                const p = getExactCanvasCoords(clientX, clientY);
                 executeMagicWand(p.x, p.y);
+            } else if (currentMode === 'box') {
+                boxSelecting = true;
+                boxSelectStartClient = { x: clientX, y: clientY };
+                boxSelectCurrentClient = { x: clientX, y: clientY };
+                const boxOverlay = document.getElementById('boxSelectOverlay');
+                boxOverlay.style.display = 'block';
+                updateBoxOverlay();
             }
         };
 
@@ -921,6 +1109,12 @@
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
+            if (boxSelecting) {
+                boxSelectCurrentClient = { x: clientX, y: clientY };
+                updateBoxOverlay();
+                return;
+            }
+
             if (isDraggingText) {
                 const p = getExactCanvasCoords(clientX, clientY);
                 const sticker = stickerDataMap[activeEditingStickerId];
@@ -935,6 +1129,11 @@
         };
 
         const handleEnd = () => {
+            if (boxSelecting) {
+                applyBoxSelection(boxSelectStartClient.x, boxSelectStartClient.y, boxSelectCurrentClient.x, boxSelectCurrentClient.y);
+                boxSelecting = false;
+                document.getElementById('boxSelectOverlay').style.display = 'none';
+            }
             isDraggingText = false;
             isPanning = false;
             initialPinchDistance = null;
@@ -953,6 +1152,11 @@
         const btn = document.getElementById('btnModeToggle');
         const badge = document.getElementById('modeBadge');
         if (currentMode === 'wand') {
+            currentMode = 'box';
+            btn.innerText = "▭ 框選模式";
+            btn.classList.add('active');
+            badge.innerText = "▭ 框選去背模式";
+        } else if (currentMode === 'box') {
             currentMode = 'pan';
             btn.innerText = "🖐️ 平移模式";
             btn.classList.remove('active');
@@ -963,6 +1167,59 @@
             btn.classList.add('active');
             badge.innerText = "🪄 點擊去背模式";
         }
+    }
+
+    // Positions the dashed selection rectangle over the drag, in screen space —
+    // this only needs to look right on screen, so no zoom/pan math is needed here.
+    function updateBoxOverlay() {
+        const overlay = document.getElementById('boxSelectOverlay');
+        const container = document.getElementById('previewContainer');
+        const rect = container.getBoundingClientRect();
+
+        const x1 = boxSelectStartClient.x - rect.left;
+        const y1 = boxSelectStartClient.y - rect.top;
+        const x2 = boxSelectCurrentClient.x - rect.left;
+        const y2 = boxSelectCurrentClient.y - rect.top;
+
+        overlay.style.left = Math.min(x1, x2) + 'px';
+        overlay.style.top = Math.min(y1, y2) + 'px';
+        overlay.style.width = Math.abs(x2 - x1) + 'px';
+        overlay.style.height = Math.abs(y2 - y1) + 'px';
+    }
+
+    // Converts the drag's two screen-space corners into canvas pixel coordinates
+    // (getExactCanvasCoords already accounts for zoom/pan) and flips every pixel in
+    // that rectangle to fully-removed (or, with 框選還原 checked, fully restored).
+    function applyBoxSelection(clientX1, clientY1, clientX2, clientY2) {
+        const sticker = stickerDataMap[activeEditingStickerId];
+        const mask = sticker.masks[currentModalFrame];
+        const imgData = sticker.frames[currentModalFrame];
+        const w = imgData.width, h = imgData.height;
+
+        const p1 = getExactCanvasCoords(clientX1, clientY1);
+        const p2 = getExactCanvasCoords(clientX2, clientY2);
+
+        const minX = Math.max(0, Math.min(p1.x, p2.x));
+        const maxX = Math.min(w - 1, Math.max(p1.x, p2.x));
+        const minY = Math.max(0, Math.min(p1.y, p2.y));
+        const maxY = Math.min(h - 1, Math.max(p1.y, p2.y));
+
+        // Ignore accidental taps that didn't really drag a rectangle.
+        if ((maxX - minX) < 3 || (maxY - minY) < 3) return;
+
+        undoStack.push({ type: 'box', frameIndex: currentModalFrame, maskCopy: new Uint8Array(mask) });
+
+        const restoreMode = document.getElementById('boxInverseMode').checked;
+        const newValue = restoreMode ? 0 : 255;
+
+        for (let y = minY; y <= maxY; y++) {
+            const rowStart = y * w;
+            for (let x = minX; x <= maxX; x++) {
+                mask[rowStart + x] = newValue;
+            }
+        }
+
+        renderModalFrame();
     }
 
     function updateCanvasTransform() {
@@ -1004,7 +1261,7 @@
             const dr = imgData.data[pxIdx] - tR, dg = imgData.data[pxIdx+1] - tG, db = imgData.data[pxIdx+2] - tB;
 
             if (dr*dr + dg*dg + db*db <= tolSq) {
-                mask[idx] = 1;
+                mask[idx] = 255;
                 if (x > 0) queue.push(x - 1, y);
                 if (x < w - 1) queue.push(x + 1, y);
                 if (y > 0) queue.push(x, y - 1);
@@ -1057,7 +1314,6 @@
             updateProgress("準備生成打包檔...", 0);
 
             const zip = new JSZip();
-            const fps = 15;
             const stickerIds = Object.keys(stickerDataMap);
             const totalStickers = stickerIds.length;
 
@@ -1071,6 +1327,7 @@
                 const sticker = stickerDataMap[id];
                 const cellW = sticker.frames[0].width;
                 const cellH = sticker.frames[0].height;
+                const perFrameDelay = Math.max(20, Math.round(sticker.frameDelayMs || (1000 / 15))); // 20ms floor per APNG spec practice
 
                 const c = document.createElement('canvas');
                 c.width = cellW; c.height = cellH;
@@ -1086,7 +1343,7 @@
 
                         const finalData = cCtx.getImageData(0, 0, cellW, cellH);
                         framesArray.push(new Uint8Array(finalData.data.buffer).buffer);
-                        delaysArray.push(Math.floor(1000 / fps));
+                        delaysArray.push(perFrameDelay);
                     }
 
                     const apngBuffer = UPNG.encode(framesArray, cellW, cellH, 0, delaysArray);
