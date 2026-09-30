@@ -214,6 +214,11 @@
                     <input type="range" id="keyTolerance" min="5" max="150" value="45" oninput="document.getElementById('tolVal').innerText=this.value; drawGrid();">
                     <span id="tolVal" style="width: 28px; text-align: right;">45</span>
                 </div>
+                <div class="slider-item" style="margin-top: 6px;">
+                    <span>強制外擴像素:</span>
+                    <input type="number" id="expandPixels" class="grid-input" style="width:60px;" min="0" max="20" value="3">
+                    <span style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;">格 (不管顏色強制多去背)</span>
+                </div>
             </div>
         </div>
 
@@ -306,6 +311,13 @@
                 <span style="font-size:0.8rem;">容許值</span>
                 <input type="range" id="modalTolRange" min="5" max="120" value="30" oninput="document.getElementById('mTolVal').innerText=this.value;">
                 <span id="mTolVal" style="width:24px; font-size:0.8rem;">30</span>
+            </div>
+
+            <!-- 🌟 個別編輯視窗內的強制外擴設定 -->
+            <div class="slider-item" style="margin-top: 4px;">
+                <span style="font-size:0.8rem;">強制外擴像素</span>
+                <input type="number" id="modalExpandPixels" class="grid-input" style="width:60px; height:34px; font-size:0.9rem;" min="0" max="20" value="3">
+                <span style="font-size:0.75rem; color:#94a3b8;">格</span>
             </div>
 
             <div style="display:flex; align-items:center; gap:8px;">
@@ -424,8 +436,6 @@
             cropBox = { left: 0, top: 0, right: videoWidth, bottom: videoHeight };
             document.getElementById('editorCard').style.display = 'block';
 
-            // Default the capture-duration field to the video's real length so the
-            // extraction covers the whole clip instead of being silently cut short.
             const capInput = document.getElementById('captureDuration');
             if (isFinite(video.duration) && video.duration > 0) {
                 capInput.value = video.duration.toFixed(2);
@@ -563,8 +573,6 @@
     function seekToTime(t) {
         return new Promise((resolve) => {
             const target = Math.min(t, Math.max(0, (video.duration || t) - 0.02));
-            // If we're already essentially at this time, 'seeked' may never fire —
-            // resolve on the next frame instead of hanging forever.
             if (Math.abs(video.currentTime - target) < 0.005) {
                 requestAnimationFrame(() => resolve());
                 return;
@@ -575,9 +583,6 @@
         });
     }
 
-    // Real usable duration of the loaded clip. Respects the "擷取長度" field the user can
-    // edit; if left blank it falls back to the full video length. Previously this was
-    // hardcoded to 2.0s, which silently truncated any longer video.
     function getEffectiveDuration() {
         const vd = video.duration;
         const capInput = document.getElementById('captureDuration');
@@ -594,7 +599,7 @@
         const input = document.getElementById('frameCountInput');
         const v = input ? parseInt(input.value) : NaN;
         if (!v || v < 2) return 40;
-        return Math.min(v, 120); // sane ceiling to avoid runaway memory/export time
+        return Math.min(v, 120);
     }
 
     function updateCaptureDurationHint() {
@@ -606,19 +611,16 @@
         hint.innerText = `≈ ${fps} fps (${maxFrames} 幀 / ${duration.toFixed(2)} 秒)`;
     }
 
-    // Cheap perceptual check for "these two frames are basically identical" — used to
-    // detect/avoid duplicate frames caused by seeking to two time points that land on
-    // the same decoded video frame.
     function framesLookIdentical(a, b) {
         if (!a || !b || a.data.length !== b.data.length) return false;
         const data1 = a.data, data2 = b.data;
-        const step = 4 * 23; // sample every ~23rd pixel, cheap but representative
+        const step = 4 * 23;
         let diffSum = 0, samples = 0;
         for (let i = 0; i < data1.length; i += step) {
             diffSum += Math.abs(data1[i] - data2[i]) + Math.abs(data1[i + 1] - data2[i + 1]) + Math.abs(data1[i + 2] - data2[i + 2]);
             samples++;
         }
-        return samples > 0 && (diffSum / samples) < 3; // near-zero average channel difference
+        return samples > 0 && (diffSum / samples) < 3;
     }
 
     async function extractAllStickers() {
@@ -636,6 +638,7 @@
         const enableKeying = document.getElementById('enableKeying').checked;
         const targetColor = hexToRgb(document.getElementById('keyColor').value);
         const tolerance = parseInt(document.getElementById('keyTolerance').value);
+        const expandPx = parseInt(document.getElementById('expandPixels').value) || 0;
 
         stickerDataMap = {};
         document.getElementById('status').innerText = "⏳ 正在處理拆分...";
@@ -662,9 +665,6 @@
                     workCtx.drawImage(video, sx, sy, cellW, cellH, 0, 0, cellW, cellH);
                     let imgData = workCtx.getImageData(0, 0, cellW, cellH);
 
-                    // If this frame is basically identical to the one right before it
-                    // (happens when the requested time points land on the same decoded
-                    // video frame), nudge forward and re-sample instead of keeping the dupe.
                     if (frames.length > 0 && framesLookIdentical(frames[frames.length - 1], imgData)) {
                         const nudged = Math.min(duration - 0.01, timePoint + frameStep * 0.6);
                         await seekToTime(nudged);
@@ -675,7 +675,7 @@
                     
                     const mask = new Uint8Array(cellW * cellH);
                     if (enableKeying) {
-                        applyInitialKeying(imgData, mask, targetColor, tolerance);
+                        applyInitialKeying(imgData, mask, targetColor, tolerance, expandPx);
                     }
                     frames.push(imgData);
                     masks.push(mask);
@@ -705,22 +705,12 @@
         renderStickerCards();
     }
 
-    // mask[] now stores a continuous 0-255 "how much this pixel is background" value
-    // instead of a hard 0/1 flag. 0 = fully keep, 255 = fully remove, values in between
-    // give a smooth, anti-aliased edge.
-    function applyInitialKeying(imgData, mask, targetColor, tolerance) {
+    function applyInitialKeying(imgData, mask, targetColor, tolerance, expandPx) {
         const data = imgData.data, w = imgData.width, h = imgData.height;
 
-        // Step 1: find the DEFINITE background using a stricter (tighter) tolerance than
-        // the user's slider. This is what actually stops the flood fill from tunnelling
-        // deep into the subject through pixels that happen to be close to the key color —
-        // previously the full (looser) tolerance was used for the entire flood fill.
         const innerTol = tolerance * 0.65;
         const bgMask = floodFillBackground(data, w, h, targetColor, innerTol);
 
-        // Step 2: soft-edge the boundary. Crucially this ramp is only ever applied to
-        // pixels that directly touch a background pixel — it can never reach further
-        // into the subject than 1px, no matter how loose "tolerance" is set.
         const tR = targetColor.r, tG = targetColor.g, tB = targetColor.b;
         const outerTol = tolerance;
 
@@ -738,14 +728,51 @@
                     mask[idx] = 255;
                 } else if (dist < outerTol) {
                     const t = (dist - innerTol) / (outerTol - innerTol);
-                    mask[idx] = Math.round((1 - t) * 255); // smooth ramp instead of a hard cut
+                    mask[idx] = Math.round((1 - t) * 255);
                 }
             }
         }
 
-        // Step 3: despill — pull the color of partially-removed edge pixels away from the
-        // key color, so no green/white halo is left once composited onto a new background.
         despillEdges(data, mask, w, h, targetColor);
+
+        if (expandPx > 0) {
+            dilateMask(mask, w, h, expandPx);
+        }
+    }
+
+    // 形態學膨脹 (Dilation) 演算法：強制將去背遮罩向外擴張指定像素
+    function dilateMask(mask, w, h, pixels) {
+        let current = new Uint8Array(mask);
+        for (let step = 0; step < pixels; step++) {
+            let next = new Uint8Array(current);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let idx = y * w + x;
+                    if (current[idx] === 0) {
+                        let hitBg = false;
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                let nx = x + dx, ny = y + dy;
+                                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                                    if (current[ny * w + nx] >= 128) {
+                                        hitBg = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (hitBg) break;
+                        }
+                        if (hitBg) {
+                            next[idx] = 255;
+                        }
+                    }
+                }
+            }
+            current = next;
+        }
+        for (let i = 0; i < mask.length; i++) {
+            mask[i] = current[i];
+        }
     }
 
     function floodFillBackground(data, w, h, targetColor, tolerance) {
@@ -772,10 +799,6 @@
                 if (x > 0 && !visited[idx - 1]) queue.push(x - 1, y);
                 if (x < w - 1 && !visited[idx + 1]) queue.push(x + 1, y);
                 if (y > 0 && !visited[idx - w]) queue.push(x, y - 1);
-                // BUG FIX: this used to be `queue.push(x, y + w)`, which pushed a
-                // y-coordinate offset by the image WIDTH instead of by 1. That silently
-                // broke downward flood-fill propagation, leaving ragged, incompletely
-                // keyed pixels behind — i.e. the fringing/毛邊.
                 if (y < h - 1 && !visited[idx + w]) queue.push(x, y + 1);
             }
         }
@@ -797,7 +820,7 @@
         const tR = targetColor.r, tG = targetColor.g, tB = targetColor.b;
         for (let idx = 0; idx < mask.length; idx++) {
             const a = mask[idx];
-            if (a === 0 || a === 255) continue; // only correct partially-transparent edge pixels
+            if (a === 0 || a === 255) continue;
             const pxIdx = idx * 4;
             const spill = a / 255;
             data[pxIdx]     -= (tR - data[pxIdx])     * spill * 0.35;
@@ -1019,7 +1042,6 @@
         for (let i = 0; i < sPx.length; i += 4) {
             const idx = i / 4;
             oPx[i] = sPx[i]; oPx[i+1] = sPx[i+1]; oPx[i+2] = sPx[i+2];
-            // mask[idx] is 0-255 "how much background" — blend instead of a hard cut.
             oPx[i+3] = Math.round(sPx[i+3] * (1 - mask[idx] / 255));
         }
 
@@ -1066,8 +1088,6 @@
             const sticker = stickerDataMap[activeEditingStickerId];
             const cfg = sticker.textConfig;
 
-            // Box-select drags a rectangle across the canvas — skip the "drag the text"
-            // shortcut here so a drag starting near the text doesn't get hijacked.
             if (currentMode !== 'box' && cfg.text) {
                 const p = getExactCanvasCoords(clientX, clientY);
                 const distToText = Math.hypot(p.x - cfg.x, p.y - cfg.y);
@@ -1169,8 +1189,6 @@
         }
     }
 
-    // Positions the dashed selection rectangle over the drag, in screen space —
-    // this only needs to look right on screen, so no zoom/pan math is needed here.
     function updateBoxOverlay() {
         const overlay = document.getElementById('boxSelectOverlay');
         const container = document.getElementById('previewContainer');
@@ -1187,9 +1205,6 @@
         overlay.style.height = Math.abs(y2 - y1) + 'px';
     }
 
-    // Converts the drag's two screen-space corners into canvas pixel coordinates
-    // (getExactCanvasCoords already accounts for zoom/pan) and flips every pixel in
-    // that rectangle to fully-removed (or, with 框選還原 checked, fully restored).
     function applyBoxSelection(clientX1, clientY1, clientX2, clientY2) {
         const sticker = stickerDataMap[activeEditingStickerId];
         const mask = sticker.masks[currentModalFrame];
@@ -1204,7 +1219,6 @@
         const minY = Math.max(0, Math.min(p1.y, p2.y));
         const maxY = Math.min(h - 1, Math.max(p1.y, p2.y));
 
-        // Ignore accidental taps that didn't really drag a rectangle.
         if ((maxX - minX) < 3 || (maxY - minY) < 3) return;
 
         undoStack.push({ type: 'box', frameIndex: currentModalFrame, maskCopy: new Uint8Array(mask) });
@@ -1269,6 +1283,12 @@
             }
         }
 
+        // 🌟 個別編輯點擊去背後，同步套用強制外擴像素
+        const expandPx = parseInt(document.getElementById('modalExpandPixels').value) || 0;
+        if (expandPx > 0) {
+            dilateMask(mask, w, h, expandPx);
+        }
+
         renderModalFrame();
     }
 
@@ -1327,7 +1347,7 @@
                 const sticker = stickerDataMap[id];
                 const cellW = sticker.frames[0].width;
                 const cellH = sticker.frames[0].height;
-                const perFrameDelay = Math.max(20, Math.round(sticker.frameDelayMs || (1000 / 15))); // 20ms floor per APNG spec practice
+                const perFrameDelay = Math.max(20, Math.round(sticker.frameDelayMs || (1000 / 15)));
 
                 const c = document.createElement('canvas');
                 c.width = cellW; c.height = cellH;
