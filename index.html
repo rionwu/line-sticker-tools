@@ -4,6 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LINE 動態貼圖專業製作工具 (Mobile Optimized)</title>
+
+    <!-- 🌐 偵測 LINE 內建瀏覽器：強制改用預設瀏覽器開啟 -->
+    <script>
+    (function () {
+        var ua = navigator.userAgent || '';
+        if (/Line\//i.test(ua)) {
+            window.__IN_LINE_BROWSER__ = true;
+            try {
+                var url = new URL(location.href);
+                if (url.searchParams.get('openExternalBrowser') !== '1') {
+                    url.searchParams.set('openExternalBrowser', '1');
+                    location.replace(url.toString());
+                }
+            } catch (e) { /* 失敗時由下方提示遮罩處理 */ }
+        }
+    })();
+    </script>
+
     <!-- 引入全球穩定 CDN 套件 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.11/pako.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -60,7 +78,7 @@
         .btn-auto { background: var(--success); }
         .btn-sec { background: #0284c7; }
         .btn-danger { background: var(--danger); color: white; }
-        
+
         input[type="number"].grid-input { width: 60px; height: 36px; padding: 4px; border-radius: 6px; border: 1px solid var(--border); font-size: 1rem; font-weight: bold; text-align: center; background: #0f172a; color: #fff; }
 
         /* Grid Items */
@@ -79,15 +97,15 @@
         .progress-bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #10b981, #06b6d4); transition: width 0.2s; }
 
         /* 📱 手機優化 Modal (全螢幕 + 上下分頁/滑動結構) */
-        .modal-overlay { 
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-            background: #0f172a; z-index: 999; display: none; flex-direction: column; 
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #0f172a; z-index: 999; display: none; flex-direction: column;
         }
 
-        .modal-header { 
-            display: flex; justify-content: space-between; align-items: center; 
-            padding: 12px 16px; border-bottom: 1px solid var(--border); 
-            background: #1e293b; height: 50px; flex-shrink: 0; 
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px; border-bottom: 1px solid var(--border);
+            background: #1e293b; height: 50px; flex-shrink: 0;
         }
 
         /* 頁籤 Toggle (畫布 vs 編輯設定) */
@@ -95,23 +113,23 @@
         .tab-btn { flex: 1; padding: 12px; text-align: center; font-size: 0.9rem; font-weight: bold; color: var(--text-muted); border: none; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; }
         .tab-btn.active { color: #38bdf8; border-bottom-color: #38bdf8; background: #1e293b; }
 
-        .modal-body-scroll { 
-            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; 
+        .modal-body-scroll {
+            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
             display: flex; flex-direction: column; padding: 12px; gap: 12px;
         }
 
         /* 畫布檢視區 */
         .preview-box-wrapper { width: 100%; flex-shrink: 0; }
-        .preview-box { 
-            position: relative; width: 100%; height: 260px; 
-            border-radius: var(--radius-md); overflow: hidden; background: #020617; 
-            touch-action: none; display: flex; align-items: center; justify-content: center; 
-            border: 1px solid var(--border); 
+        .preview-box {
+            position: relative; width: 100%; height: 260px;
+            border-radius: var(--radius-md); overflow: hidden; background: #020617;
+            touch-action: none; display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--border);
         }
 
         .preview-box.bg-light { background: #ffffff !important; }
         .preview-box.bg-dark { background: #0f172a !important; }
-        .preview-box.bg-grid { 
+        .preview-box.bg-grid {
             background-image: linear-gradient(45deg, #334155 25%, transparent 25%), linear-gradient(-45deg, #334155 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #334155 75%), linear-gradient(-45deg, transparent 75%, #334155 75%);
             background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0px; background-color: #0f172a;
         }
@@ -146,9 +164,29 @@
 
         .footer-bar { display: flex; justify-content: space-between; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--border); background: #1e293b; flex-shrink: 0; }
         #status { font-weight: bold; color: #38bdf8; margin-top: 8px; text-align: center; font-size: 0.85rem; }
+
+        /* 🌐 LINE 瀏覽器提示遮罩 */
+        #lineBrowserOverlay {
+            position: fixed; inset: 0; z-index: 9999; display: none; flex-direction: column;
+            align-items: center; justify-content: center; gap: 14px; padding: 28px;
+            background: rgba(2, 6, 23, 0.97); text-align: center;
+        }
+        #lineBrowserOverlay h2 { font-size: 1.2rem; }
+        #lineBrowserOverlay p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+        #lineBrowserOverlay .btn { max-width: 320px; }
     </style>
 </head>
 <body>
+
+<!-- 🌐 LINE 內建瀏覽器提示（自動跳轉失敗時顯示） -->
+<div id="lineBrowserOverlay">
+    <div style="font-size:2.5rem;">🌐</div>
+    <h2>請使用預設瀏覽器開啟</h2>
+    <p>偵測到您正在使用 LINE 內建瀏覽器，<br>下載與影片處理功能可能無法正常運作。<br><br>
+       請點擊右上角「⋯」或「分享」圖示，<br>選擇「以預設瀏覽器開啟」(Safari / Chrome)。</p>
+    <button class="btn btn-auto" onclick="openInDefaultBrowser()">🚀 嘗試以預設瀏覽器開啟</button>
+    <button class="btn btn-sec" onclick="copyPageLink()">📋 複製網址</button>
+</div>
 
 <div class="container">
     <div class="app-header">
@@ -172,7 +210,7 @@
             <span class="step-num">1</span>
             <span>定位網格與自動去背</span>
         </div>
-        
+
         <div class="stage-container">
             <video id="mainVideo" loop muted playsinline></video>
             <canvas id="overlayCanvas" class="overlay"></canvas>
@@ -198,7 +236,7 @@
                 </div>
                 <div class="slider-item">
                     <span>總幀數:</span>
-                    <input type="number" id="frameCountInput" class="grid-input" style="width:70px;" min="2" max="120" step="1" value="40" oninput="updateCaptureDurationHint()">
+                    <input type="number" id="frameCountInput" class="grid-input" style="width:70px;" min="2" max="120" step="1" value="20" oninput="updateCaptureDurationHint()">
                     <span id="captureDurationHint" style="font-size:0.75rem; color:var(--text-muted);"></span>
                 </div>
             </div>
@@ -216,7 +254,7 @@
                 </div>
                 <div class="slider-item" style="margin-top: 6px;">
                     <span>強制外擴像素:</span>
-                    <input type="number" id="expandPixels" class="grid-input" style="width:60px;" min="0" max="20" value="3">
+                    <input type="number" id="expandPixels" class="grid-input" style="width:60px;" min="0" max="20" value="1">
                     <span style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;">格 (不管顏色強制多去背)</span>
                 </div>
             </div>
@@ -235,12 +273,12 @@
             </div>
 
             <div class="stickers-grid" id="stickersGrid"></div>
-            
+
             <div class="export-options-bar">
                 <label for="exportFormatSelect" style="font-size:0.85rem;"><b>🎯 選擇 LINE 上架管道格式：</b></label>
                 <select id="exportFormatSelect" class="export-select">
+                    <option value="sequence" selected>📁 PNG 影格資料夾 (手機版 拍貼 App)</option>
                     <option value="apng">🖼️ APNG 動態檔 (電腦版 Market)</option>
-                    <option value="sequence">📁 PNG 影格資料夾 (手機版 拍貼 App)</option>
                 </select>
                 <button class="btn" id="exportBtn" style="margin-top: 4px;" onclick="exportAllStickersZip()">📦 打包下載 ZIP 檔案</button>
             </div>
@@ -275,9 +313,9 @@
         <!-- 畫布區 (永遠放在最上方，便利手勢操作) -->
         <div class="preview-box-wrapper">
             <div class="preview-box bg-dark" id="previewContainer">
-                <div class="mode-badge" id="modeBadge">🪄 點擊去背</div>
+                <div class="mode-badge" id="modeBadge">🪄 點擊去背模式</div>
                 <div id="boxSelectOverlay" style="position:absolute; display:none; border:2px dashed #38bdf8; background:rgba(56,189,248,0.18); pointer-events:none; z-index:5;"></div>
-                
+
                 <div class="bg-toggles">
                     <button class="bg-toggle-btn" onclick="setBg('light', this)">☀️</button>
                     <button class="bg-toggle-btn active" onclick="setBg('dark', this)">🌙</button>
@@ -316,7 +354,7 @@
             <!-- 🌟 個別編輯視窗內的強制外擴設定 -->
             <div class="slider-item" style="margin-top: 4px;">
                 <span style="font-size:0.8rem;">強制外擴像素</span>
-                <input type="number" id="modalExpandPixels" class="grid-input" style="width:60px; height:34px; font-size:0.9rem;" min="0" max="20" value="3">
+                <input type="number" id="modalExpandPixels" class="grid-input" style="width:60px; height:34px; font-size:0.9rem;" min="0" max="20" value="1">
                 <span style="font-size:0.75rem; color:#94a3b8;">格</span>
             </div>
 
@@ -392,6 +430,41 @@
 </div>
 
 <script>
+    // 🌐 LINE 內建瀏覽器處理：若自動跳轉後仍在 LINE 內，顯示手動提示
+    function openInDefaultBrowser() {
+        try {
+            const url = new URL(location.href);
+            url.searchParams.set('openExternalBrowser', '1');
+            // Android：嘗試以 intent 方式叫起 Chrome
+            if (/Android/i.test(navigator.userAgent)) {
+                const plain = url.toString().replace(/^https?:\/\//, '');
+                const scheme = url.protocol.replace(':', '');
+                location.href = `intent://${plain}#Intent;scheme=${scheme};package=com.android.chrome;end`;
+                setTimeout(() => { window.open(url.toString(), '_blank'); }, 600);
+            } else {
+                window.open(url.toString(), '_blank');
+            }
+        } catch (e) { alert('請點右上角「⋯」選擇「以預設瀏覽器開啟」'); }
+    }
+
+    function copyPageLink() {
+        const link = location.href;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(link).then(() => alert('✅ 網址已複製，請貼到 Safari / Chrome 開啟'));
+        } else {
+            prompt('請複製以下網址，到 Safari / Chrome 開啟：', link);
+        }
+    }
+
+    if (window.__IN_LINE_BROWSER__) {
+        window.addEventListener('DOMContentLoaded', () => {
+            // 稍等片刻讓自動跳轉有機會執行，仍停留在 LINE 內才顯示遮罩
+            setTimeout(() => {
+                document.getElementById('lineBrowserOverlay').style.display = 'flex';
+            }, 800);
+        });
+    }
+
     const video = document.getElementById('mainVideo');
     const overlay = document.getElementById('overlayCanvas');
     const ctx = overlay.getContext('2d');
@@ -402,7 +475,7 @@
     let horizontalLines = [];
     let draggingTarget = null;
 
-    let stickerDataMap = {}; 
+    let stickerDataMap = {};
     let activeEditingStickerId = null;
     let currentModalFrame = 0;
     let isPlaying = false, playInterval = null;
@@ -411,9 +484,7 @@
     let isDraggingText = false;
     let zoomScale = 1;
     let panOffset = { x: 0, y: 0 };
-    let currentMode = 'wand'; 
-    let isPanning = false;
-    let startPan = { x: 0, y: 0 };
+    let currentMode = 'wand';
     let initialPinchDistance = null;
     let boxSelecting = false;
     let boxSelectStartClient = null;
@@ -491,11 +562,11 @@
 
         if (minX !== -1 && maxX !== -1 && minY !== -1 && maxY !== -1) {
             const padding = 10;
-            cropBox = { 
-                left: Math.max(0, minX - padding), 
-                top: Math.max(0, minY - padding), 
-                right: Math.min(videoWidth, maxX + padding), 
-                bottom: Math.min(videoHeight, maxY + padding) 
+            cropBox = {
+                left: Math.max(0, minX - padding),
+                top: Math.max(0, minY - padding),
+                right: Math.min(videoWidth, maxX + padding),
+                bottom: Math.min(videoHeight, maxY + padding)
             };
             verticalLines = findSplitLines(xDensity, cropBox.left, cropBox.right, cols);
             horizontalLines = findSplitLines(yDensity, cropBox.top, cropBox.bottom, rows);
@@ -598,7 +669,7 @@
     function getFrameCount() {
         const input = document.getElementById('frameCountInput');
         const v = input ? parseInt(input.value) : NaN;
-        if (!v || v < 2) return 40;
+        if (!v || v < 2) return 20;
         return Math.min(v, 120);
     }
 
@@ -630,7 +701,7 @@
 
         video.pause();
         const duration = getEffectiveDuration();
-        const maxFrames = getFrameCount(); 
+        const maxFrames = getFrameCount();
         const totalFrames = maxFrames;
         const vBounds = [cropBox.left, ...verticalLines, cropBox.right];
         const hBounds = [cropBox.top, ...horizontalLines, cropBox.bottom];
@@ -672,7 +743,7 @@
                         workCtx.drawImage(video, sx, sy, cellW, cellH, 0, 0, cellW, cellH);
                         imgData = workCtx.getImageData(0, 0, cellW, cellH);
                     }
-                    
+
                     const mask = new Uint8Array(cellW * cellH);
                     if (enableKeying) {
                         applyInitialKeying(imgData, mask, targetColor, tolerance, expandPx);
@@ -681,9 +752,9 @@
                     masks.push(mask);
                 }
 
-                stickerDataMap[id] = { 
-                    frames, 
-                    masks, 
+                stickerDataMap[id] = {
+                    frames,
+                    masks,
                     frameDelayMs,
                     textConfig: {
                         text: '',
@@ -843,7 +914,7 @@
             const frame0 = data.frames[0];
             pCanvas.width = frame0.width; pCanvas.height = frame0.height;
             const pCtx = pCanvas.getContext('2d');
-            
+
             renderSingleFrameToCanvas(pCtx, data, 0);
 
             card.innerHTML = `
@@ -859,7 +930,7 @@
         activeEditingStickerId = id;
         currentModalFrame = 0;
         undoStack = [];
-        
+
         syncUIWithStickerTextConfig(stickerDataMap[id].textConfig);
 
         document.getElementById('modalTitle').innerText = `編輯貼圖 #${id}`;
@@ -1060,7 +1131,7 @@
     function getExactCanvasCoords(clientX, clientY) {
         const canvas = document.getElementById('previewCanvas');
         const rect = canvas.getBoundingClientRect();
-        
+
         const relX = (clientX - rect.left) / rect.width;
         const relY = (clientY - rect.top) / rect.height;
 
@@ -1097,10 +1168,7 @@
                 }
             }
 
-            if (currentMode === 'pan') {
-                isPanning = true;
-                startPan = { x: clientX - panOffset.x, y: clientY - panOffset.y };
-            } else if (currentMode === 'wand') {
+            if (currentMode === 'wand') {
                 const p = getExactCanvasCoords(clientX, clientY);
                 executeMagicWand(p.x, p.y);
             } else if (currentMode === 'box') {
@@ -1141,10 +1209,6 @@
                 sticker.textConfig.x = p.x;
                 sticker.textConfig.y = p.y;
                 renderModalFrame();
-            } else if (isPanning) {
-                panOffset.x = clientX - startPan.x;
-                panOffset.y = clientY - startPan.y;
-                updateCanvasTransform();
             }
         };
 
@@ -1155,7 +1219,6 @@
                 document.getElementById('boxSelectOverlay').style.display = 'none';
             }
             isDraggingText = false;
-            isPanning = false;
             initialPinchDistance = null;
         };
 
@@ -1168,25 +1231,20 @@
         window.ontouchend = handleEnd;
     }
 
+    // 僅在「去背模式」與「框選模式」之間切換
     function toggleInteractionMode() {
         const btn = document.getElementById('btnModeToggle');
         const badge = document.getElementById('modeBadge');
         if (currentMode === 'wand') {
             currentMode = 'box';
             btn.innerText = "▭ 框選模式";
-            btn.classList.add('active');
             badge.innerText = "▭ 框選去背模式";
-        } else if (currentMode === 'box') {
-            currentMode = 'pan';
-            btn.innerText = "🖐️ 平移模式";
-            btn.classList.remove('active');
-            badge.innerText = "🖐️ 畫布拖曳/縮放模式";
         } else {
             currentMode = 'wand';
             btn.innerText = "🪄 去背模式";
-            btn.classList.add('active');
             badge.innerText = "🪄 點擊去背模式";
         }
+        btn.classList.add('active');
     }
 
     function updateBoxOverlay() {
@@ -1320,11 +1378,11 @@
         const progressText = document.getElementById('progressText');
         const progressPercent = document.getElementById('progressPercent');
         const progressBarFill = document.getElementById('progressBarFill');
-        
+
         try {
             exportBtn.disabled = true;
             progressContainer.style.display = 'block';
-            
+
             const updateProgress = (text, percent) => {
                 progressText.innerText = text;
                 progressPercent.innerText = `${percent}%`;
