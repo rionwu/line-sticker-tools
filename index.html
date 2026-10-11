@@ -256,10 +256,12 @@
             </div>
 
             <div class="control-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <input type="checkbox" id="enableKeying" checked onchange="drawGrid()" style="width:20px; height:20px;">
                     <label for="enableKeying" style="font-size:0.85rem;"><b>開啟漫水去背</b></label>
-                    <input type="color" id="keyColor" value="#28FF28" onchange="drawGrid()" style="border:none; width:32px; height:32px; cursor:pointer; border-radius:4px; background:none;">
+                    <input type="color" id="keyColor" value="#28FF28" onchange="updateKeyColorLabel(); drawGrid();" style="border:none; width:32px; height:32px; cursor:pointer; border-radius:4px; background:none;">
+                    <span id="keyColorHex" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace;">#28FF28</span>
+                    <button type="button" class="btn-outline" id="eyedropperBtn" onclick="toggleEyedropper()" style="min-height:36px; padding:4px 10px;">💧 滴管</button>
                 </div>
                 <div class="slider-item" style="margin-top: 6px;">
                     <span>去背容許值:</span>
@@ -650,6 +652,55 @@
         applyStageTransform();
     }
 
+    // ===== 滴管：點選影片畫面取色 =====
+    let pickMode = false;
+
+    function updateKeyColorLabel() {
+        document.getElementById('keyColorHex').innerText = document.getElementById('keyColor').value.toUpperCase();
+    }
+
+    function toggleEyedropper(forceState) {
+        pickMode = typeof forceState === 'boolean' ? forceState : !pickMode;
+        const btn = document.getElementById('eyedropperBtn');
+        btn.classList.toggle('active', pickMode);
+        overlay.style.cursor = pickMode ? 'copy' : 'crosshair';
+        const status = document.getElementById('status');
+        if (pickMode) {
+            video.pause();
+            status.innerText = "💧 滴管已開啟：請點一下影片中要去除的背景顏色";
+        } else {
+            video.play();
+            if (status.innerText.startsWith("💧")) status.innerText = "";
+        }
+    }
+
+    function pickColorAt(clientX, clientY) {
+        const rect = overlay.getBoundingClientRect();
+        const px = Math.floor((clientX - rect.left) * (videoWidth / rect.width));
+        const py = Math.floor((clientY - rect.top) * (videoHeight / rect.height));
+        if (px < 0 || py < 0 || px >= videoWidth || py >= videoHeight) return;
+
+        const c = document.createElement('canvas');
+        c.width = videoWidth; c.height = videoHeight;
+        const cx = c.getContext('2d', { willReadFrequently: true });
+        cx.drawImage(video, 0, 0, videoWidth, videoHeight);
+
+        // 取 5x5 範圍平均，避免影片壓縮雜訊造成顏色偏差
+        const x0 = Math.max(0, px - 2), y0 = Math.max(0, py - 2);
+        const w = Math.min(videoWidth - x0, 5), h = Math.min(videoHeight - y0, 5);
+        const d = cx.getImageData(x0, y0, w, h).data;
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+        r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+
+        const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+        document.getElementById('keyColor').value = hex;
+        updateKeyColorLabel();
+        toggleEyedropper(false);
+        document.getElementById('status').innerText = `✅ 已取色 ${hex.toUpperCase()}`;
+        drawGrid();
+    }
+
     let dragEventsReady = false;
     function setupDragEvents() {
         if (dragEventsReady) return;
@@ -658,6 +709,7 @@
         const viewport = document.getElementById('stageViewport');
         let pinch = null;      // { dist, mx, my }
         let panning = null;    // { x, y }
+        let pickStart = null;  // 滴管：記錄點擊起點，判斷是點一下還是拖曳
 
         const getCanvasPos = (clientX, clientY) => {
             const rect = overlay.getBoundingClientRect();
@@ -670,12 +722,18 @@
 
         const onStart = (e) => {
             if (e.touches && e.touches.length >= 2) {
-                draggingTarget = null; panning = null;
+                draggingTarget = null; panning = null; pickStart = null;
                 pinch = pinchInfo(e);
                 return;
             }
             const cx = e.touches ? e.touches[0].clientX : e.clientX;
             const cy = e.touches ? e.touches[0].clientY : e.clientY;
+            if (pickMode) {
+                pickStart = { x: cx, y: cy, moved: false };
+                draggingTarget = null;
+                if (stageZoom > 1) panning = { x: cx, y: cy };
+                return;
+            }
             const { x, y } = getCanvasPos(cx, cy);
             // 點擊判定範圍固定約 26 個螢幕像素（放大後會自動變精細）
             const tol = 26 * (videoWidth / overlay.getBoundingClientRect().width);
@@ -703,6 +761,7 @@
             }
             const cx = e.touches ? e.touches[0].clientX : e.clientX;
             const cy = e.touches ? e.touches[0].clientY : e.clientY;
+            if (pickStart && Math.hypot(cx - pickStart.x, cy - pickStart.y) > 8) pickStart.moved = true;
             if (panning) {
                 stagePan.x += cx - panning.x;
                 stagePan.y += cy - panning.y;
@@ -722,6 +781,8 @@
         };
 
         const onEnd = (e) => {
+            if (pickStart && !pinch && !pickStart.moved) pickColorAt(pickStart.x, pickStart.y);
+            pickStart = null;
             if (e && e.touches && e.touches.length === 1 && pinch) {
                 // 雙指放開其中一指：結束縮放，避免畫面跳動
                 pinch = null; panning = null; draggingTarget = null;
