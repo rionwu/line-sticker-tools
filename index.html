@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>LINE 動態貼圖專業製作工具 (Mobile Optimized)</title>
 
     <!-- 🌐 偵測 LINE 內建瀏覽器：強制改用預設瀏覽器開啟 -->
@@ -63,6 +63,11 @@
         /* Stage Area */
         .stage-container { position: relative; display: block; width: 100%; user-select: none; touch-action: none; border-radius: var(--radius-md); overflow: hidden; background: #000; border: 1px solid var(--border); }
         video { width: 100%; display: block; background: #000; }
+        .stage-inner { position: relative; width: 100%; transform-origin: 0 0; will-change: transform; }
+        .zoom-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+        .zoom-btn { flex: 0 0 auto; min-width: 48px; height: 40px; padding: 0 12px; border: 1px solid var(--border); background: #0f172a; color: #e2e8f0; border-radius: 8px; font-size: 1rem; font-weight: 800; }
+        .zoom-btn:active { background: #312e81; }
+        .zoom-label { flex: 1; text-align: center; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
         canvas.overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
 
         /* Controls Panel */
@@ -211,10 +216,19 @@
             <span>定位網格與自動去背</span>
         </div>
 
-        <div class="stage-container">
-            <video id="mainVideo" loop muted playsinline></video>
-            <canvas id="overlayCanvas" class="overlay"></canvas>
+        <div class="zoom-bar">
+            <button class="zoom-btn" onclick="zoomStageBy(1/1.4)">－</button>
+            <span class="zoom-label" id="stageZoomLabel">100%</span>
+            <button class="zoom-btn" onclick="zoomStageBy(1.4)">＋</button>
+            <button class="zoom-btn" onclick="resetStageZoom()">重置</button>
         </div>
+        <div class="stage-container" id="stageViewport">
+            <div class="stage-inner" id="stageInner">
+                <video id="mainVideo" loop muted playsinline></video>
+                <canvas id="overlayCanvas" class="overlay"></canvas>
+            </div>
+        </div>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin-top:6px;">💡 雙指縮放畫面、放大後單指拖曳空白處可平移；拖曳線條可調整裁切位置。</p>
 
         <div class="control-panel">
             <div class="control-group">
@@ -514,6 +528,7 @@
             }
             updateCaptureDurationHint();
 
+            resetStageZoom();
             video.play();
             initGridLines();
             setupDragEvents();
@@ -592,22 +607,79 @@
 
     function drawGrid() {
         ctx.clearRect(0, 0, overlay.width, overlay.height);
-        ctx.strokeStyle = '#818cf8'; ctx.setLineDash([6, 6]); ctx.lineWidth = 3;
+        const rectW = overlay.getBoundingClientRect().width;
+        const k = rectW > 0 && videoWidth ? videoWidth / rectW : 1; // 每個螢幕像素對應的影片像素
+        ctx.strokeStyle = '#818cf8'; ctx.setLineDash([6 * k, 6 * k]); ctx.lineWidth = 2 * k;
         ctx.strokeRect(cropBox.left, cropBox.top, cropBox.right - cropBox.left, cropBox.bottom - cropBox.top);
-        ctx.strokeStyle = '#38bdf8'; ctx.setLineDash([]); ctx.lineWidth = 2;
+        ctx.strokeStyle = '#38bdf8'; ctx.setLineDash([]); ctx.lineWidth = 1.5 * k;
         verticalLines.forEach(x => { ctx.beginPath(); ctx.moveTo(x, cropBox.top); ctx.lineTo(x, cropBox.bottom); ctx.stroke(); });
         horizontalLines.forEach(y => { ctx.beginPath(); ctx.moveTo(cropBox.left, y); ctx.lineTo(cropBox.right, y); ctx.stroke(); });
     }
 
+    // ===== 畫面縮放 / 平移 =====
+    let stageZoom = 1, stagePan = { x: 0, y: 0 };
+
+    function applyStageTransform() {
+        const inner = document.getElementById('stageInner');
+        const w = inner.offsetWidth, h = inner.offsetHeight;
+        stagePan.x = Math.min(0, Math.max(w * (1 - stageZoom), stagePan.x));
+        stagePan.y = Math.min(0, Math.max(h * (1 - stageZoom), stagePan.y));
+        inner.style.transform = `translate(${stagePan.x}px, ${stagePan.y}px) scale(${stageZoom})`;
+        document.getElementById('stageZoomLabel').innerText = Math.round(stageZoom * 100) + '%';
+        drawGrid();
+    }
+
+    function zoomStageAt(factor, clientX, clientY) {
+        const vp = document.getElementById('stageViewport').getBoundingClientRect();
+        const lx = clientX - vp.left, ly = clientY - vp.top;
+        const newZoom = Math.min(8, Math.max(1, stageZoom * factor));
+        const ratio = newZoom / stageZoom;
+        stagePan.x = lx - (lx - stagePan.x) * ratio;
+        stagePan.y = ly - (ly - stagePan.y) * ratio;
+        stageZoom = newZoom;
+        applyStageTransform();
+    }
+
+    function zoomStageBy(factor) {
+        const vp = document.getElementById('stageViewport').getBoundingClientRect();
+        zoomStageAt(factor, vp.left + vp.width / 2, vp.top + vp.height / 2);
+    }
+
+    function resetStageZoom() {
+        stageZoom = 1; stagePan = { x: 0, y: 0 };
+        applyStageTransform();
+    }
+
+    let dragEventsReady = false;
     function setupDragEvents() {
-        const getCanvasPos = (e) => {
+        if (dragEventsReady) return;
+        dragEventsReady = true;
+
+        const viewport = document.getElementById('stageViewport');
+        let pinch = null;      // { dist, mx, my }
+        let panning = null;    // { x, y }
+
+        const getCanvasPos = (clientX, clientY) => {
             const rect = overlay.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             return { x: (clientX - rect.left) * (videoWidth / rect.width), y: (clientY - rect.top) * (videoHeight / rect.height) };
         };
+        const pinchInfo = (e) => {
+            const a = e.touches[0], b = e.touches[1];
+            return { dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2 };
+        };
+
         const onStart = (e) => {
-            const { x, y } = getCanvasPos(e); const tol = 30;
+            if (e.touches && e.touches.length >= 2) {
+                draggingTarget = null; panning = null;
+                pinch = pinchInfo(e);
+                return;
+            }
+            const cx = e.touches ? e.touches[0].clientX : e.clientX;
+            const cy = e.touches ? e.touches[0].clientY : e.clientY;
+            const { x, y } = getCanvasPos(cx, cy);
+            // 點擊判定範圍固定約 26 個螢幕像素（放大後會自動變精細）
+            const tol = 26 * (videoWidth / overlay.getBoundingClientRect().width);
+            draggingTarget = null;
             if (Math.abs(x - cropBox.left) < tol) draggingTarget = { type: 'cropL' };
             else if (Math.abs(x - cropBox.right) < tol) draggingTarget = { type: 'cropR' };
             else if (Math.abs(y - cropBox.top) < tol) draggingTarget = { type: 'cropT' };
@@ -616,10 +688,30 @@
                 for (let i = 0; i < verticalLines.length; i++) if (Math.abs(x - verticalLines[i]) < tol) { draggingTarget = { type: 'vLine', index: i }; return; }
                 for (let j = 0; j < horizontalLines.length; j++) if (Math.abs(y - horizontalLines[j]) < tol) { draggingTarget = { type: 'hLine', index: j }; return; }
             }
+            // 沒點到線，且已放大 → 單指平移畫面
+            if (!draggingTarget && stageZoom > 1) panning = { x: cx, y: cy };
         };
+
         const onMove = (e) => {
+            if (e.touches && e.touches.length >= 2 && pinch) {
+                const now = pinchInfo(e);
+                stagePan.x += now.mx - pinch.mx;
+                stagePan.y += now.my - pinch.my;
+                zoomStageAt(now.dist / pinch.dist, now.mx, now.my);
+                pinch = now;
+                return;
+            }
+            const cx = e.touches ? e.touches[0].clientX : e.clientX;
+            const cy = e.touches ? e.touches[0].clientY : e.clientY;
+            if (panning) {
+                stagePan.x += cx - panning.x;
+                stagePan.y += cy - panning.y;
+                panning = { x: cx, y: cy };
+                applyStageTransform();
+                return;
+            }
             if (!draggingTarget) return;
-            const { x, y } = getCanvasPos(e);
+            const { x, y } = getCanvasPos(cx, cy);
             if (draggingTarget.type === 'cropL') cropBox.left = Math.min(Math.max(0, x), cropBox.right - 10);
             else if (draggingTarget.type === 'cropR') cropBox.right = Math.max(Math.min(videoWidth, x), cropBox.left + 10);
             else if (draggingTarget.type === 'cropT') cropBox.top = Math.min(Math.max(0, y), cropBox.bottom - 10);
@@ -628,12 +720,31 @@
             else if (draggingTarget.type === 'hLine') horizontalLines[draggingTarget.index] = Math.min(Math.max(cropBox.top, y), cropBox.bottom);
             drawGrid();
         };
+
+        const onEnd = (e) => {
+            if (e && e.touches && e.touches.length === 1 && pinch) {
+                // 雙指放開其中一指：結束縮放，避免畫面跳動
+                pinch = null; panning = null; draggingTarget = null;
+                return;
+            }
+            pinch = null; panning = null; draggingTarget = null;
+        };
+
         overlay.addEventListener('mousedown', onStart);
-        overlay.addEventListener('touchstart', onStart, {passive: true});
+        overlay.addEventListener('touchstart', onStart, { passive: true });
         window.addEventListener('mousemove', onMove);
-        window.addEventListener('touchmove', onMove, {passive: true});
-        window.addEventListener('mouseup', () => draggingTarget = null);
-        window.addEventListener('touchend', () => draggingTarget = null);
+        window.addEventListener('touchmove', onMove, { passive: true });
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('touchend', onEnd);
+        window.addEventListener('touchcancel', onEnd);
+
+        // 電腦版：滑鼠滾輪縮放
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            zoomStageAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY);
+        }, { passive: false });
+
+        window.addEventListener('resize', applyStageTransform);
     }
 
     function hexToRgb(hex) {
