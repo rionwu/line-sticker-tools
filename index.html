@@ -68,25 +68,31 @@
         .zoom-btn { flex: 0 0 auto; min-width: 48px; height: 40px; padding: 0 12px; border: 1px solid var(--border); background: #0f172a; color: #e2e8f0; border-radius: 8px; font-size: 1rem; font-weight: 800; }
         .zoom-btn:active { background: #312e81; }
         .zoom-label { flex: 1; text-align: center; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
-        /* 手動微調面板 */
-        .adjust-panel { background: #0f172a; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; margin-top: 12px; display: none; flex-direction: column; gap: 12px; }
-        .adjust-panel h4 { font-size: 0.85rem; color: #38bdf8; font-weight: 700; }
-        .adj-select { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .adj-select .adj-label { font-weight: 800; font-size: 0.95rem; text-align: center; flex: 1; }
-        .adj-select button { flex: 0 0 auto; border: 1px solid var(--border); background: #1e293b; color: #cbd5e1; border-radius: 8px; min-height: 44px; padding: 0 12px; font-size: 0.85rem; font-weight: 700; }
-        .adj-live-wrap { background: #000; border: 1px solid var(--border); border-radius: 10px; padding: 8px; display: flex; align-items: center; justify-content: center; min-height: 120px; }
-        .adj-live-wrap canvas { max-width: 100%; max-height: 190px; object-fit: contain; }
-        .adj-size { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: -4px; }
-        .adj-step { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; flex-wrap: wrap; }
-        .adj-step .seg { display: inline-flex; background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
-        .adj-step .seg button { border: none; background: transparent; color: #94a3b8; border-radius: 6px; padding: 8px 14px; font-size: 0.8rem; font-weight: 700; }
-        .adj-step .seg button.active { background: var(--primary); color: #fff; }
-        .edge-table { display: grid; grid-template-columns: 48px 1fr 1fr; gap: 8px; align-items: center; }
-        .edge-table .edge-name { font-size: 0.85rem; font-weight: 700; }
-        .edge-table button, .move-pad button { min-height: 46px; border: 1px solid var(--border); background: #1e293b; color: #e2e8f0; border-radius: 10px; font-size: 0.85rem; font-weight: 700; touch-action: manipulation; }
-        .edge-table button:active, .move-pad button:active { background: #312e81; border-color: var(--primary); }
-        .move-pad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 46px); gap: 6px; justify-content: center; }
-        .move-pad .up { grid-column: 2; grid-row: 1; } .move-pad .left { grid-column: 1; grid-row: 2; } .move-pad .right { grid-column: 3; grid-row: 2; } .move-pad .down { grid-column: 2; grid-row: 3; }
+        /* 全螢幕微調貼圖範圍 */
+        .be-modal { z-index: 1000; height: 100vh; height: 100dvh; }
+        .be-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: #0f172a; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .be-nav button { border: 1px solid var(--border); background: #1e293b; color: #cbd5e1; border-radius: 8px; min-height: 40px; padding: 0 12px; font-size: 0.85rem; font-weight: 700; }
+        .be-nav .be-size { flex: 1; text-align: center; font-size: 0.8rem; color: #94a3b8; font-weight: 600; }
+        .be-stage { position: relative; flex: 1; min-height: 0; background: #000; }
+        .be-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+        .be-zoom { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 2; }
+        .be-zoom button { width: 44px; height: 40px; border: 1px solid rgba(255,255,255,.25); background: rgba(15,23,42,.82); color: #fff; border-radius: 8px; font-weight: 800; font-size: 1rem; }
+        .be-hint { position: absolute; left: 8px; bottom: 8px; z-index: 2; font-size: 0.72rem; color: #e2e8f0; background: rgba(15,23,42,.75); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
+        .be-controls { flex-shrink: 0; padding: 10px 12px; background: #0f172a; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+        .be-timeline { display: flex; align-items: center; gap: 10px; }
+        .be-timeline button { flex: 0 0 auto; width: 52px; min-height: 40px; border: 1px solid var(--border); background: #1e293b; color: #e2e8f0; border-radius: 8px; font-size: 0.9rem; font-weight: 700; }
+        .be-timeline input[type="range"] { flex: 1; accent-color: var(--primary); height: 28px; }
+        .be-time { flex: 0 0 auto; min-width: 86px; text-align: right; font-size: 0.72rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
+        .be-row { display: flex; gap: 8px; align-items: center; }
+        .be-edges { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .be-edges button, .be-steps button { min-height: 42px; border: 1px solid var(--border); background: #1e293b; color: #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 700; }
+        .be-edges button.active { background: #facc15; border-color: #facc15; color: #1f2937; }
+        .be-steps { display: flex; gap: 6px; flex: 0 0 auto; }
+        .be-steps button { width: 46px; }
+        .be-steps button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .be-nudge { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .be-nudge button { min-height: 54px; border: 1px solid var(--border); background: #1e293b; color: #e2e8f0; border-radius: 10px; font-size: 1rem; font-weight: 800; touch-action: manipulation; }
+        .be-nudge button:active { background: #312e81; border-color: var(--primary); }
         canvas.overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
 
         /* Controls Panel */
@@ -247,7 +253,7 @@
                 <canvas id="overlayCanvas" class="overlay"></canvas>
             </div>
         </div>
-        <p style="font-size:0.72rem; color:var(--text-muted); margin-top:6px;">💡 雙指縮放畫面、放大後單指拖曳可平移；點一下畫面上的框可選取該貼圖，再用下方按鈕微調範圍。</p>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin-top:6px;">💡 雙指縮放畫面、放大後單指拖曳可平移；點一下畫面上的框，會開啟全螢幕畫面讓你拖曳邊緣微調範圍。</p>
 
         <div class="control-panel">
             <div class="control-group">
@@ -281,11 +287,16 @@
                     <input type="color" id="keyColor" value="#28FF28" onchange="updateKeyColorLabel(); drawGrid();" style="border:none; width:32px; height:32px; cursor:pointer; border-radius:4px; background:none;">
                     <span id="keyColorHex" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace;">#28FF28</span>
                     <button type="button" class="btn-outline" id="eyedropperBtn" onclick="toggleEyedropper()" style="min-height:36px; padding:4px 10px;">💧 滴管</button>
+                    <button type="button" class="btn-outline" onclick="autoPickKeyColorButton()" style="min-height:36px; padding:4px 10px;">✨ 自動取背景色</button>
                 </div>
                 <div class="slider-item" style="margin-top: 6px;">
                     <span>去背容許值:</span>
                     <input type="range" id="keyTolerance" min="5" max="150" value="45" oninput="document.getElementById('tolVal').innerText=this.value; drawGrid();">
                     <span id="tolVal" style="width: 28px; text-align: right;">45</span>
+                </div>
+                <div style="display:flex; align-items:flex-start; gap:8px; margin-top: 8px;">
+                    <input type="checkbox" id="removeEnclosed" style="width:20px; height:20px; margin-top:2px; flex-shrink:0;">
+                    <label for="removeEnclosed" style="font-size:0.85rem;"><b>同時移除被圍住的背景</b><br><span style="font-size:0.72rem; color:var(--text-muted);">每一格影格各自判斷。貼圖本身若有跟背景相近的顏色，也會被一起去掉。</span></label>
                 </div>
                 <div class="slider-item" style="margin-top: 6px;">
                     <span>強制外擴像素:</span>
@@ -305,53 +316,6 @@
             <button class="btn btn-sec" onclick="extractAllStickers()">✂️ 拆分貼圖</button>
         </div>
         <div id="status"></div>
-
-        <!-- 📐 手動微調選取貼圖的範圍 -->
-        <div class="adjust-panel" id="adjustPanel">
-            <h4>📐 手動微調貼圖範圍</h4>
-            <div class="adj-select">
-                <button onclick="selectRelative(-1)">◀ 上一張</button>
-                <span class="adj-label" id="adjLabel">第 1 張</span>
-                <button onclick="selectRelative(1)">下一張 ▶</button>
-            </div>
-            <div class="adj-live-wrap"><canvas id="adjLive"></canvas></div>
-            <div class="adj-size" id="adjSize">-</div>
-
-            <div class="adj-step">
-                <span>每次移動</span>
-                <div class="seg" id="stepSeg">
-                    <button data-step="1">1px</button>
-                    <button data-step="5" class="active">5px</button>
-                    <button data-step="20">20px</button>
-                </div>
-                <span style="font-size:0.72rem; color:var(--text-muted);">按住可連續調整</span>
-            </div>
-
-            <div class="edge-table">
-                <div class="edge-name">上邊</div>
-                <button data-act="edge" data-edge="top" data-dir="1">▲ 外擴</button>
-                <button data-act="edge" data-edge="top" data-dir="-1">▼ 內縮</button>
-                <div class="edge-name">下邊</div>
-                <button data-act="edge" data-edge="bottom" data-dir="1">▼ 外擴</button>
-                <button data-act="edge" data-edge="bottom" data-dir="-1">▲ 內縮</button>
-                <div class="edge-name">左邊</div>
-                <button data-act="edge" data-edge="left" data-dir="1">◀ 外擴</button>
-                <button data-act="edge" data-edge="left" data-dir="-1">▶ 內縮</button>
-                <div class="edge-name">右邊</div>
-                <button data-act="edge" data-edge="right" data-dir="1">▶ 外擴</button>
-                <button data-act="edge" data-edge="right" data-dir="-1">◀ 內縮</button>
-            </div>
-
-            <div style="font-size:0.8rem; font-weight:700;">整個框一起移動</div>
-            <div class="move-pad">
-                <button class="up" data-act="move" data-dx="0" data-dy="-1">▲</button>
-                <button class="left" data-act="move" data-dx="-1" data-dy="0">◀</button>
-                <button class="right" data-act="move" data-dx="1" data-dy="0">▶</button>
-                <button class="down" data-act="move" data-dx="0" data-dy="1">▼</button>
-            </div>
-
-            <button class="btn btn-auto" style="min-height:44px;" onclick="redetectOne()">🎯 重新偵測此張</button>
-        </div>
 
         <div id="stickersListSection" style="display:none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px;">
             <div class="step-title">
@@ -380,6 +344,55 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- 📐 全螢幕：微調單張貼圖的範圍（點一下畫面上的框開啟） -->
+<div class="modal-overlay be-modal" id="boxEditor">
+    <div class="modal-header">
+        <span id="beTitle" style="font-weight:bold; font-size:0.95rem;">調整範圍</span>
+        <button onclick="closeBoxEditor()" style="border:none; background:transparent; color:#94a3b8; font-size:1.4rem; padding:4px 8px;">✕</button>
+    </div>
+    <div class="be-nav">
+        <button onclick="beGo(-1)">◀ 上一張</button>
+        <span class="be-size" id="beSize">-</span>
+        <button onclick="beGo(1)">下一張 ▶</button>
+    </div>
+    <div class="be-stage" id="beStage">
+        <canvas id="beCanvas"></canvas>
+        <div class="be-zoom">
+            <button onclick="beZoom(1.6)" title="縮小檢視">－</button>
+            <button onclick="beZoom(1/1.6)" title="放大檢視">＋</button>
+            <button onclick="beRecenter()" title="重新置中">⟲</button>
+        </div>
+        <div class="be-hint">拖曳框的邊或角來調整</div>
+    </div>
+    <div class="be-controls">
+        <div class="be-timeline">
+            <button id="bePlayBtn" onclick="beTogglePlay()">⏸</button>
+            <input type="range" id="beSlider" min="0" max="1000" value="0">
+            <span class="be-time" id="beTime">0.00s</span>
+        </div>
+        <div class="be-row">
+            <div class="be-edges" id="beEdges">
+                <button data-edge="top">上邊</button>
+                <button data-edge="bottom">下邊</button>
+                <button data-edge="left">左邊</button>
+                <button data-edge="right">右邊</button>
+            </div>
+            <div class="be-steps" id="beSteps">
+                <button data-step="1" class="active">1px</button>
+                <button data-step="5">5px</button>
+            </div>
+        </div>
+        <div class="be-nudge" id="beNudge">
+            <button data-dir="-1" id="beShrink">▼ 內縮</button>
+            <button data-dir="1" id="beGrow">▲ 外擴</button>
+        </div>
+    </div>
+    <div class="footer-bar">
+        <button class="btn-outline" style="flex:1;" onclick="beRestore()">🎯 還原此張</button>
+        <button class="btn" style="flex:1;" onclick="closeBoxEditor()">✓ 完成</button>
     </div>
 </div>
 
@@ -608,8 +621,7 @@
             video.play();
             initGridLines();
             setupDragEvents();
-            setupAdjustPanel();
-            autoDetectBoxes();   // 載入後自動偵測每個貼圖的範圍
+            autoSetupAfterLoad();   // 載入後：自動取得去背顏色 → 自動偵測每個貼圖的範圍
         };
     }
 
@@ -755,7 +767,7 @@
                 cx.drawImage(video, 0, 0, aw, ah);
                 const img = cx.getImageData(0, 0, aw, ah);
                 const mask = new Uint8Array(aw * ah);
-                applyInitialKeying(img, mask, color, tol, expand);
+                applyInitialKeying(img, mask, color, tol, expand, document.getElementById('removeEnclosed').checked);
                 for (let p = 0; p < mask.length; p++) if (mask[p] < 128) union[p] = 0;
                 await tick();
             }
@@ -773,9 +785,11 @@
             selected = 0;
 
             const empties = found.filter(b => b.empty).length;
-            status.innerText = empties
+            const base = empties
                 ? `⚠️ 有 ${empties} 格偵測不到貼圖主體，請確認去背顏色與容許值（可用滴管取色）`
-                : `✅ 已偵測 ${boxes.length} 個貼圖範圍，點選畫面上的框可微調`;
+                : `✅ 已偵測 ${boxes.length} 個貼圖範圍，點一下畫面上的框可全螢幕微調`;
+            status.innerText = base + (colorNote ? `\n${colorNote}` : '');
+            colorNote = '';
         } catch (err) {
             console.error(err);
             status.innerText = '❌ 偵測失敗：' + err.message;
@@ -819,15 +833,106 @@
         });
     }
 
-    // ===== 手動微調 =====
+    // ===== 自動辨識背景顏色 =====
+    let colorNote = '';
+
+    function setKeyColorFromRgb(r, g, b) {
+        const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+        document.getElementById('keyColor').value = hex;
+        updateKeyColorLabel();
+        return hex.toUpperCase();
+    }
+
+    // 取影片幾個時間點，統計畫面「最外圈」的顏色，最多的那個顏色（且占六成以上）就當背景色
+    async function autoPickKeyColor() {
+        if (!videoWidth || detecting) return false;
+        detecting = true;
+        const status = document.getElementById('status');
+        const wasPlaying = !video.paused, t0 = video.currentTime;
+        video.pause();
+        let ok = false;
+        try {
+            status.innerText = '⏳ 正在自動辨識背景顏色…';
+            const duration = getEffectiveDuration();
+            const scale = Math.min(1, 320 / Math.max(videoWidth, videoHeight));
+            const aw = Math.max(8, Math.round(videoWidth * scale)), ah = Math.max(8, Math.round(videoHeight * scale));
+            const cv = document.createElement('canvas');
+            cv.width = aw; cv.height = ah;
+            const cx = cv.getContext('2d', { willReadFrequently: true });
+            const RING = 2, SAMPLES = 5;
+            const ring = [];
+            const addPx = (d, x, y) => { const i = (y * aw + x) * 4; ring.push(d[i], d[i + 1], d[i + 2]); };
+
+            for (let k = 0; k < SAMPLES; k++) {
+                await seekToTime(duration * (k + 0.5) / SAMPLES);
+                cx.drawImage(video, 0, 0, aw, ah);
+                const d = cx.getImageData(0, 0, aw, ah).data;
+                for (let y = 0; y < ah; y++) {
+                    if (y < RING || y >= ah - RING) { for (let x = 0; x < aw; x++) addPx(d, x, y); }
+                    else { for (let x = 0; x < RING; x++) addPx(d, x, y); for (let x = aw - RING; x < aw; x++) addPx(d, x, y); }
+                }
+            }
+
+            const n = ring.length / 3;
+            // 先把顏色分成 16 階的格子，找出最多的那一格
+            const bins = new Map();
+            for (let i = 0; i < ring.length; i += 3) {
+                const key = ((ring[i] >> 4) << 8) | ((ring[i + 1] >> 4) << 4) | (ring[i + 2] >> 4);
+                bins.set(key, (bins.get(key) || 0) + 1);
+            }
+            let topKey = -1, topCount = 0;
+            bins.forEach((c, k) => { if (c > topCount) { topCount = c; topKey = k; } });
+            const cR = ((topKey >> 8) & 15) * 16 + 8, cG = ((topKey >> 4) & 15) * 16 + 8, cB = (topKey & 15) * 16 + 8;
+
+            // 再平均與該顏色相近的像素，得到更精準的色碼
+            let sr = 0, sg = 0, sb = 0, m = 0;
+            for (let i = 0; i < ring.length; i += 3) {
+                if (Math.hypot(ring[i] - cR, ring[i + 1] - cG, ring[i + 2] - cB) <= 40) { sr += ring[i]; sg += ring[i + 1]; sb += ring[i + 2]; m++; }
+            }
+            if (m > 0) {
+                const mr = Math.round(sr / m), mg = Math.round(sg / m), mb = Math.round(sb / m);
+                let within = 0;
+                for (let i = 0; i < ring.length; i += 3) if (Math.hypot(ring[i] - mr, ring[i + 1] - mg, ring[i + 2] - mb) <= 30) within++;
+                const coverage = within / n;
+                if (coverage >= 0.6) {
+                    const hex = setKeyColorFromRgb(mr, mg, mb);
+                    colorNote = `🎨 已自動取得去背顏色 ${hex}（畫面外圈 ${Math.round(coverage * 100)}% 是這個顏色）`;
+                    ok = true;
+                }
+            }
+            if (!ok) colorNote = '⚠️ 無法確定背景色（畫面外圈的顏色不一致），已保留目前的去背顏色，請改用滴管選取';
+        } catch (err) {
+            console.error(err);
+            colorNote = '⚠️ 自動取色失敗，請用滴管選取背景色';
+        } finally {
+            detecting = false;
+            try { await seekToTime(t0); } catch (_) {}
+            if (wasPlaying && !pickMode) video.play();
+            drawGrid();
+        }
+        return ok;
+    }
+
+    async function autoPickKeyColorButton() {
+        await autoPickKeyColor();
+        document.getElementById('status').innerText = colorNote + '\n（顏色改變後，可再按「自動偵測每個貼圖範圍」重新框選）';
+        colorNote = '';
+    }
+
+    async function autoSetupAfterLoad() {
+        await autoPickKeyColor();
+        await autoDetectBoxes();
+    }
+
+    // ===== 選取 / 調整貼圖範圍 =====
     function selectSticker(i) {
         if (!boxes.length) return;
         selected = (i + boxes.length) % boxes.length;
         drawGrid();
         renderAdjust();
     }
-    function selectRelative(d) { selectSticker(selected + d); }
 
+    // 點一下畫面上的框：選取並開啟全螢幕微調
     function selectBoxAt(clientX, clientY) {
         const rect = overlay.getBoundingClientRect();
         const x = (clientX - rect.left) * (videoWidth / rect.width);
@@ -839,7 +944,7 @@
                 if (area < bestArea) { bestArea = area; best = i; }
             }
         });
-        if (best >= 0) selectSticker(best);
+        if (best >= 0) { selectSticker(best); openBoxEditor(best); }
     }
 
     function adjustEdge(edge, delta) {   // delta > 0 往外擴、< 0 往內縮
@@ -852,72 +957,215 @@
         drawGrid(); renderAdjust();
     }
 
-    function moveBox(dx, dy) {
-        const b = boxes[selected]; if (!b) return;
-        const w = b.r - b.l, h = b.b - b.t;
-        b.l = clampN(b.l + dx, 0, videoWidth - w); b.r = b.l + w;
-        b.t = clampN(b.t + dy, 0, videoHeight - h); b.b = b.t + h;
-        b.manual = true;
-        drawGrid(); renderAdjust();
-    }
-
     function redetectOne() {
         if (!autoBoxes[selected]) return;
         boxes[selected] = { ...autoBoxes[selected], manual: false };
         drawGrid(); renderAdjust();
     }
 
-    function renderAdjust() {
-        const panel = document.getElementById('adjustPanel');
-        const b = boxes[selected];
-        if (!b) { panel.style.display = 'none'; return; }
-        panel.style.display = 'flex';
-        document.getElementById('adjLabel').innerText = `第 ${selected + 1} 張${b.manual ? '（已手動調整）' : ''}`;
-        document.getElementById('adjSize').innerText = `${b.r - b.l} × ${b.b - b.t} px　位置 (${b.l}, ${b.t})`;
-        drawLive();
+    // ===== 全螢幕微調範圍 =====
+    let beOpen = false, beEdge = 'top', beStep = 1, beDrag = null, beSeeking = false, beMargin = 0.4;
+    let beView = { x: 0, y: 0, w: 1, h: 1 }, beGeom = null, beTimer = null, beReady = false;
+    const EDGE_NAMES = { top: '上邊', bottom: '下邊', left: '左邊', right: '右邊' };
+    const EDGE_ARROWS = { top: ['▼', '▲'], bottom: ['▲', '▼'], left: ['▶', '◀'], right: ['◀', '▶'] };  // [內縮, 外擴]
+
+    function renderAdjust() { if (beOpen) updateBeUI(); }
+
+    function openBoxEditor(i) {
+        if (!boxes.length) return;
+        selected = clampN(i, 0, boxes.length - 1);
+        beMargin = 0.4; beEdge = 'top';
+        setupBoxEditor();
+        document.getElementById('boxEditor').style.display = 'flex';
+        beOpen = true;
+        if (video.paused && !pickMode) video.play();
+        computeBeView();
+        updateBeUI();
+        clearInterval(beTimer);
+        beTimer = setInterval(beTick, 50);
     }
 
-    // 即時顯示目前選取貼圖的裁切範圍（跟著影片播放）
-    function drawLive() {
-        const b = boxes[selected];
-        const cv = document.getElementById('adjLive');
-        if (!b || !cv || !video.videoWidth || video.readyState < 2) return;
-        const w = b.r - b.l, h = b.b - b.t;
-        if (cv.width !== w) cv.width = w;
-        if (cv.height !== h) cv.height = h;
-        const c = cv.getContext('2d');
-        c.clearRect(0, 0, w, h);
-        c.drawImage(video, b.l, b.t, w, h, 0, 0, w, h);
+    function closeBoxEditor() {
+        beOpen = false; beDrag = null;
+        clearInterval(beTimer); beTimer = null;
+        document.getElementById('boxEditor').style.display = 'none';
+        drawGrid();
     }
 
-    let adjustPanelReady = false;
-    function setupAdjustPanel() {
-        if (adjustPanelReady) return;
-        adjustPanelReady = true;
+    function beGo(d) {
+        if (!boxes.length) return;
+        selected = (selected + d + boxes.length) % boxes.length;
+        computeBeView(); updateBeUI(); drawGrid();
+    }
 
-        document.getElementById('stepSeg').querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
-            stepSize = parseInt(btn.dataset.step);
-            document.getElementById('stepSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === btn));
-        }));
+    // 以目前這張的框為中心，四周多留一圈空白，當作檢視範圍
+    function computeBeView() {
+        const b = boxes[selected]; if (!b) return;
+        const mx = Math.max(30, (b.r - b.l) * beMargin), my = Math.max(30, (b.b - b.t) * beMargin);
+        const x0 = Math.max(0, b.l - mx), y0 = Math.max(0, b.t - my);
+        const x1 = Math.min(videoWidth, b.r + mx), y1 = Math.min(videoHeight, b.b + my);
+        beView = { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
+    }
+    function beZoom(f) { beMargin = clampN(beMargin * f, 0.03, 4); computeBeView(); }
+    function beRecenter() { beMargin = 0.4; computeBeView(); }
 
-        // 按住按鈕可連續調整
-        document.querySelectorAll('#adjustPanel [data-act]').forEach(btn => {
-            let delayTimer = null, repeatTimer = null;
-            const fire = () => {
-                if (btn.dataset.act === 'edge') adjustEdge(btn.dataset.edge, parseInt(btn.dataset.dir) * stepSize);
-                else moveBox(parseInt(btn.dataset.dx) * stepSize, parseInt(btn.dataset.dy) * stepSize);
-            };
-            const stop = () => { clearTimeout(delayTimer); clearInterval(repeatTimer); delayTimer = repeatTimer = null; };
-            btn.addEventListener('pointerdown', (e) => {
-                e.preventDefault();
-                fire();
-                delayTimer = setTimeout(() => { repeatTimer = setInterval(fire, 70); }, 350);
+    function beRestore() { redetectOne(); computeBeView(); updateBeUI(); }
+
+    function beNudge(dir) { adjustEdge(beEdge, dir * beStep); }
+
+    function beTogglePlay() {
+        if (video.paused) video.play(); else video.pause();
+    }
+
+    function beLayout() {
+        const stage = document.getElementById('beStage'), cv = document.getElementById('beCanvas');
+        const cw = stage.clientWidth, ch = stage.clientHeight;
+        if (!cw || !ch) return null;
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const pw = Math.round(cw * dpr), ph = Math.round(ch * dpr);
+        if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+        const pad = 16;
+        const s = Math.max(0.01, Math.min((cw - pad * 2) / beView.w, (ch - pad * 2) / beView.h));
+        beGeom = { cw, ch, dpr, s, ox: (cw - beView.w * s) / 2, oy: (ch - beView.h * s) / 2 };
+        return beGeom;
+    }
+    const beX = (x) => beGeom.ox + (x - beView.x) * beGeom.s;
+    const beY = (y) => beGeom.oy + (y - beView.y) * beGeom.s;
+
+    function beDraw() {
+        const g = beGeom, b = boxes[selected];
+        if (!g || !b) return;
+        const cv = document.getElementById('beCanvas'), c = cv.getContext('2d');
+        c.setTransform(g.dpr, 0, 0, g.dpr, 0, 0);
+        c.fillStyle = '#000'; c.fillRect(0, 0, g.cw, g.ch);
+
+        const vx0 = beX(beView.x), vy0 = beY(beView.y), vw = beView.w * g.s, vh = beView.h * g.s;
+        if (video.readyState >= 2) c.drawImage(video, beView.x, beView.y, beView.w, beView.h, vx0, vy0, vw, vh);
+
+        const L = beX(b.l), T = beY(b.t), R = beX(b.r), B = beY(b.b);
+        // 框外變暗，凸顯目前的範圍
+        c.fillStyle = 'rgba(0,0,0,0.55)';
+        c.beginPath(); c.rect(vx0, vy0, vw, vh); c.rect(L, T, R - L, B - T); c.fill('evenodd');
+
+        c.strokeStyle = '#FF2E93'; c.lineWidth = 2; c.strokeRect(L, T, R - L, B - T);
+
+        // 四條邊的把手（目前選取的邊是黃色）
+        const bar = (edge, cx, cy, horizontal) => {
+            const len = Math.max(16, Math.min(46, (horizontal ? R - L : B - T) * 0.6));
+            c.fillStyle = beEdge === edge ? '#FACC15' : '#FFFFFF';
+            c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1;
+            const w = horizontal ? len : 8, h = horizontal ? 8 : len;
+            c.fillRect(cx - w / 2, cy - h / 2, w, h);
+            c.strokeRect(cx - w / 2, cy - h / 2, w, h);
+        };
+        bar('top', (L + R) / 2, T, true);
+        bar('bottom', (L + R) / 2, B, true);
+        bar('left', L, (T + B) / 2, false);
+        bar('right', R, (T + B) / 2, false);
+    }
+
+    function beTick() {
+        if (!beOpen) return;
+        if (!beLayout()) return;
+        beDraw();
+
+        const eff = getEffectiveDuration();
+        const slider = document.getElementById('beSlider');
+        if (!beSeeking && eff > 0) slider.value = Math.round(clampN(video.currentTime / eff, 0, 1) * 1000);
+        document.getElementById('beTime').innerText = `${video.currentTime.toFixed(2)}s / ${eff.toFixed(2)}s`;
+        document.getElementById('bePlayBtn').innerText = video.paused ? '▶' : '⏸';
+    }
+
+    function updateBeUI() {
+        const b = boxes[selected]; if (!b) return;
+        document.getElementById('beTitle').innerText = `調整第 ${selected + 1} 張範圍${b.manual ? '（已手動調整）' : ''}`;
+        document.getElementById('beSize').innerText = `${b.r - b.l} × ${b.b - b.t} px`;
+        document.querySelectorAll('#beEdges button').forEach(x => x.classList.toggle('active', x.dataset.edge === beEdge));
+        document.querySelectorAll('#beSteps button').forEach(x => x.classList.toggle('active', parseInt(x.dataset.step) === beStep));
+        const [shrink, grow] = EDGE_ARROWS[beEdge];
+        document.getElementById('beShrink').innerText = `${shrink} ${EDGE_NAMES[beEdge]}內縮`;
+        document.getElementById('beGrow').innerText = `${grow} ${EDGE_NAMES[beEdge]}外擴`;
+    }
+
+    // 找出手指碰到的邊（靠近角落時，同時抓住橫向與縱向兩條邊）
+    function beHit(px, py) {
+        const b = boxes[selected]; if (!b || !beGeom) return [];
+        const L = beX(b.l), R = beX(b.r), T = beY(b.t), B = beY(b.b), tol = 30;
+        const inX = px >= L - tol && px <= R + tol, inY = py >= T - tol && py <= B + tol;
+        const cand = [];
+        if (inX && Math.abs(py - T) < tol) cand.push({ e: 'top', d: Math.abs(py - T) });
+        if (inX && Math.abs(py - B) < tol) cand.push({ e: 'bottom', d: Math.abs(py - B) });
+        if (inY && Math.abs(px - L) < tol) cand.push({ e: 'left', d: Math.abs(px - L) });
+        if (inY && Math.abs(px - R) < tol) cand.push({ e: 'right', d: Math.abs(px - R) });
+        const pick = (names) => cand.filter(c => names.includes(c.e)).sort((a, z) => a.d - z.d)[0];
+        return [pick(['top', 'bottom']), pick(['left', 'right'])].filter(Boolean).map(c => c.e);
+    }
+
+    function setupBoxEditor() {
+        if (beReady) return;
+        beReady = true;
+
+        const cv = document.getElementById('beCanvas');
+        const local = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+
+        cv.addEventListener('pointerdown', (e) => {
+            if (!beOpen) return;
+            const p = local(e);
+            const edges = beHit(p.x, p.y);
+            if (!edges.length) return;
+            e.preventDefault();
+            const b = boxes[selected];
+            beDrag = { edges, sx: p.x, sy: p.y, start: { l: b.l, t: b.t, r: b.r, b: b.b } };
+            beEdge = edges[0];
+            try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+            updateBeUI();
+        });
+
+        cv.addEventListener('pointermove', (e) => {
+            if (!beDrag || !beGeom) return;
+            const p = local(e), b = boxes[selected], st = beDrag.start;
+            // 用「相對移動量」：手指不必壓在邊上，就不會擋住要看的地方
+            const dx = (p.x - beDrag.sx) / beGeom.s, dy = (p.y - beDrag.sy) / beGeom.s;
+            beDrag.edges.forEach(edge => {
+                if (edge === 'top')    b.t = clampN(Math.round(st.t + dy), 0, b.b - MIN_BOX);
+                if (edge === 'bottom') b.b = clampN(Math.round(st.b + dy), b.t + MIN_BOX, videoHeight);
+                if (edge === 'left')   b.l = clampN(Math.round(st.l + dx), 0, b.r - MIN_BOX);
+                if (edge === 'right')  b.r = clampN(Math.round(st.r + dx), b.l + MIN_BOX, videoWidth);
             });
+            b.manual = true;
+            drawGrid(); updateBeUI();
+        });
+
+        const endDrag = () => { if (beDrag) { beDrag = null; drawGrid(); } };
+        cv.addEventListener('pointerup', endDrag);
+        cv.addEventListener('pointercancel', endDrag);
+
+        // 選擇要微調的邊 / 每次移動的像素
+        document.querySelectorAll('#beEdges button').forEach(btn => btn.addEventListener('click', () => { beEdge = btn.dataset.edge; updateBeUI(); }));
+        document.querySelectorAll('#beSteps button').forEach(btn => btn.addEventListener('click', () => { beStep = parseInt(btn.dataset.step); updateBeUI(); }));
+
+        // 內縮 / 外擴：按住可連續調整
+        document.querySelectorAll('#beNudge button').forEach(btn => {
+            let delayTimer = null, repeatTimer = null;
+            const fire = () => beNudge(parseInt(btn.dataset.dir));
+            const stop = () => { clearTimeout(delayTimer); clearInterval(repeatTimer); delayTimer = repeatTimer = null; };
+            btn.addEventListener('pointerdown', (e) => { e.preventDefault(); fire(); delayTimer = setTimeout(() => { repeatTimer = setInterval(fire, 70); }, 350); });
             ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
             btn.addEventListener('contextmenu', (e) => e.preventDefault());
         });
 
-        setInterval(drawLive, 120);
+        // 時間軸：拉到動作最大的那一格，確認框有沒有切到
+        const slider = document.getElementById('beSlider');
+        slider.addEventListener('input', () => {
+            beSeeking = true;
+            video.pause();
+            const eff = getEffectiveDuration();
+            const t = parseInt(slider.value) / 1000 * eff;
+            video.currentTime = Math.min(t, Math.max(0, (video.duration || t) - 0.02));
+        });
+        slider.addEventListener('change', () => { beSeeking = false; });
+
+        window.addEventListener('resize', () => { if (beOpen) computeBeView(); });
     }
 
     // ===== 畫面縮放 / 平移 =====
@@ -1148,6 +1396,7 @@
         const targetColor = hexToRgb(document.getElementById('keyColor').value);
         const tolerance = parseInt(document.getElementById('keyTolerance').value);
         const expandPx = parseInt(document.getElementById('expandPixels').value) || 0;
+        const removeEnclosed = document.getElementById('removeEnclosed').checked;
 
         stickerDataMap = {};
         document.getElementById('status').innerText = "⏳ 正在處理拆分...";
@@ -1185,7 +1434,7 @@
 
                     const mask = new Uint8Array(cellW * cellH);
                     if (enableKeying) {
-                        applyInitialKeying(imgData, mask, targetColor, tolerance, expandPx);
+                        applyInitialKeying(imgData, mask, targetColor, tolerance, expandPx, removeEnclosed);
                     }
                     frames.push(imgData);
                     masks.push(mask);
@@ -1215,11 +1464,23 @@
         renderStickerCards();
     }
 
-    function applyInitialKeying(imgData, mask, targetColor, tolerance, expandPx) {
+    function applyInitialKeying(imgData, mask, targetColor, tolerance, expandPx, removeEnclosed) {
         const data = imgData.data, w = imgData.width, h = imgData.height;
 
         const innerTol = tolerance * 0.65;
         const bgMask = floodFillBackground(data, w, h, targetColor, innerTol);
+
+        // 勾選「同時移除被圍住的背景」：沒連到邊緣、但顏色相同的區域也一併視為背景（這一格影格各自判斷）
+        if (removeEnclosed) {
+            const eR = targetColor.r, eG = targetColor.g, eB = targetColor.b;
+            const eSq = innerTol * innerTol * 3;
+            for (let idx = 0; idx < w * h; idx++) {
+                if (bgMask[idx]) continue;
+                const pi = idx * 4;
+                const dr = data[pi] - eR, dg = data[pi + 1] - eG, db = data[pi + 2] - eB;
+                if (dr * dr + dg * dg + db * db <= eSq) bgMask[idx] = 1;
+            }
+        }
 
         const tR = targetColor.r, tG = targetColor.g, tB = targetColor.b;
         const outerTol = tolerance;
