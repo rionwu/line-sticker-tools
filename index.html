@@ -68,6 +68,25 @@
         .zoom-btn { flex: 0 0 auto; min-width: 48px; height: 40px; padding: 0 12px; border: 1px solid var(--border); background: #0f172a; color: #e2e8f0; border-radius: 8px; font-size: 1rem; font-weight: 800; }
         .zoom-btn:active { background: #312e81; }
         .zoom-label { flex: 1; text-align: center; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+        /* 手動微調面板 */
+        .adjust-panel { background: #0f172a; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; margin-top: 12px; display: none; flex-direction: column; gap: 12px; }
+        .adjust-panel h4 { font-size: 0.85rem; color: #38bdf8; font-weight: 700; }
+        .adj-select { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .adj-select .adj-label { font-weight: 800; font-size: 0.95rem; text-align: center; flex: 1; }
+        .adj-select button { flex: 0 0 auto; border: 1px solid var(--border); background: #1e293b; color: #cbd5e1; border-radius: 8px; min-height: 44px; padding: 0 12px; font-size: 0.85rem; font-weight: 700; }
+        .adj-live-wrap { background: #000; border: 1px solid var(--border); border-radius: 10px; padding: 8px; display: flex; align-items: center; justify-content: center; min-height: 120px; }
+        .adj-live-wrap canvas { max-width: 100%; max-height: 190px; object-fit: contain; }
+        .adj-size { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: -4px; }
+        .adj-step { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; flex-wrap: wrap; }
+        .adj-step .seg { display: inline-flex; background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+        .adj-step .seg button { border: none; background: transparent; color: #94a3b8; border-radius: 6px; padding: 8px 14px; font-size: 0.8rem; font-weight: 700; }
+        .adj-step .seg button.active { background: var(--primary); color: #fff; }
+        .edge-table { display: grid; grid-template-columns: 48px 1fr 1fr; gap: 8px; align-items: center; }
+        .edge-table .edge-name { font-size: 0.85rem; font-weight: 700; }
+        .edge-table button, .move-pad button { min-height: 46px; border: 1px solid var(--border); background: #1e293b; color: #e2e8f0; border-radius: 10px; font-size: 0.85rem; font-weight: 700; touch-action: manipulation; }
+        .edge-table button:active, .move-pad button:active { background: #312e81; border-color: var(--primary); }
+        .move-pad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 46px); gap: 6px; justify-content: center; }
+        .move-pad .up { grid-column: 2; grid-row: 1; } .move-pad .left { grid-column: 1; grid-row: 2; } .move-pad .right { grid-column: 3; grid-row: 2; } .move-pad .down { grid-column: 2; grid-row: 3; }
         canvas.overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
 
         /* Controls Panel */
@@ -213,7 +232,7 @@
     <div class="card" id="editorCard" style="display:none;">
         <div class="step-title">
             <span class="step-num">1</span>
-            <span>定位網格與自動去背</span>
+            <span>偵測貼圖範圍與自動去背</span>
         </div>
 
         <div class="zoom-bar">
@@ -228,7 +247,7 @@
                 <canvas id="overlayCanvas" class="overlay"></canvas>
             </div>
         </div>
-        <p style="font-size:0.72rem; color:var(--text-muted); margin-top:6px;">💡 雙指縮放畫面、放大後單指拖曳空白處可平移；拖曳線條可調整裁切位置。</p>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin-top:6px;">💡 雙指縮放畫面、放大後單指拖曳可平移；點一下畫面上的框可選取該貼圖，再用下方按鈕微調範圍。</p>
 
         <div class="control-panel">
             <div class="control-group">
@@ -273,14 +292,66 @@
                     <input type="number" id="expandPixels" class="grid-input" style="width:60px;" min="0" max="20" value="2">
                     <span style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;">格 (不管顏色強制多去背)</span>
                 </div>
+                <div class="slider-item" style="margin-top: 6px;">
+                    <span>偵測框留白:</span>
+                    <input type="number" id="padPx" class="grid-input" style="width:60px;" min="0" max="100" value="10">
+                    <span style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;">像素 (貼圖四周多留的邊)</span>
+                </div>
             </div>
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
-            <button class="btn btn-auto" onclick="autoDetectGrid()">✨ 自動定位分割線</button>
+            <button class="btn btn-auto" onclick="autoDetectBoxes()">✨ 自動偵測每個貼圖範圍</button>
             <button class="btn btn-sec" onclick="extractAllStickers()">✂️ 拆分貼圖</button>
         </div>
         <div id="status"></div>
+
+        <!-- 📐 手動微調選取貼圖的範圍 -->
+        <div class="adjust-panel" id="adjustPanel">
+            <h4>📐 手動微調貼圖範圍</h4>
+            <div class="adj-select">
+                <button onclick="selectRelative(-1)">◀ 上一張</button>
+                <span class="adj-label" id="adjLabel">第 1 張</span>
+                <button onclick="selectRelative(1)">下一張 ▶</button>
+            </div>
+            <div class="adj-live-wrap"><canvas id="adjLive"></canvas></div>
+            <div class="adj-size" id="adjSize">-</div>
+
+            <div class="adj-step">
+                <span>每次移動</span>
+                <div class="seg" id="stepSeg">
+                    <button data-step="1">1px</button>
+                    <button data-step="5" class="active">5px</button>
+                    <button data-step="20">20px</button>
+                </div>
+                <span style="font-size:0.72rem; color:var(--text-muted);">按住可連續調整</span>
+            </div>
+
+            <div class="edge-table">
+                <div class="edge-name">上邊</div>
+                <button data-act="edge" data-edge="top" data-dir="1">▲ 外擴</button>
+                <button data-act="edge" data-edge="top" data-dir="-1">▼ 內縮</button>
+                <div class="edge-name">下邊</div>
+                <button data-act="edge" data-edge="bottom" data-dir="1">▼ 外擴</button>
+                <button data-act="edge" data-edge="bottom" data-dir="-1">▲ 內縮</button>
+                <div class="edge-name">左邊</div>
+                <button data-act="edge" data-edge="left" data-dir="1">◀ 外擴</button>
+                <button data-act="edge" data-edge="left" data-dir="-1">▶ 內縮</button>
+                <div class="edge-name">右邊</div>
+                <button data-act="edge" data-edge="right" data-dir="1">▶ 外擴</button>
+                <button data-act="edge" data-edge="right" data-dir="-1">◀ 內縮</button>
+            </div>
+
+            <div style="font-size:0.8rem; font-weight:700;">整個框一起移動</div>
+            <div class="move-pad">
+                <button class="up" data-act="move" data-dx="0" data-dy="-1">▲</button>
+                <button class="left" data-act="move" data-dx="-1" data-dy="0">◀</button>
+                <button class="right" data-act="move" data-dx="1" data-dy="0">▶</button>
+                <button class="down" data-act="move" data-dx="0" data-dy="1">▼</button>
+            </div>
+
+            <button class="btn btn-auto" style="min-height:44px;" onclick="redetectOne()">🎯 重新偵測此張</button>
+        </div>
 
         <div id="stickersListSection" style="display:none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px;">
             <div class="step-title">
@@ -486,10 +557,14 @@
     const ctx = overlay.getContext('2d');
     let videoWidth = 0, videoHeight = 0;
 
-    let cropBox = { left: 0, top: 0, right: 0, bottom: 0 };
-    let verticalLines = [];
-    let horizontalLines = [];
-    let draggingTarget = null;
+    // 每個貼圖各自的範圍框（影片像素座標）：{ l, t, r, b, manual }
+    let boxes = [];
+    let autoBoxes = [];
+    let selected = 0;
+    let stepSize = 5;
+    let detecting = false;
+    const NOISE = 3;       // 少於這個像素數的行/列視為雜訊
+    const MIN_BOX = 10;    // 範圍框最小邊長
 
     let stickerDataMap = {};
     let activeEditingStickerId = null;
@@ -520,7 +595,6 @@
         video.onloadedmetadata = () => {
             videoWidth = video.videoWidth; videoHeight = video.videoHeight;
             overlay.width = videoWidth; overlay.height = videoHeight;
-            cropBox = { left: 0, top: 0, right: videoWidth, bottom: videoHeight };
             document.getElementById('editorCard').style.display = 'block';
 
             const capInput = document.getElementById('captureDuration');
@@ -534,88 +608,316 @@
             video.play();
             initGridLines();
             setupDragEvents();
+            setupAdjustPanel();
+            autoDetectBoxes();   // 載入後自動偵測每個貼圖的範圍
         };
     }
 
+    // 行/列改變時：先用「平均等分」建立預設的框，再按「自動偵測」精準框出每個貼圖
     function initGridLines() {
         const rows = parseInt(document.getElementById('gridRows').value);
         const cols = parseInt(document.getElementById('gridCols').value);
-        if (!rows || !cols) return;
-        verticalLines = []; horizontalLines = [];
-        const activeW = cropBox.right - cropBox.left;
-        const activeH = cropBox.bottom - cropBox.top;
-        for (let i = 1; i < cols; i++) verticalLines.push(cropBox.left + (activeW / cols) * i);
-        for (let j = 1; j < rows; j++) horizontalLines.push(cropBox.top + (activeH / rows) * j);
+        if (!rows || !cols || !videoWidth) return;
+        boxes = [];
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                boxes.push({
+                    l: Math.floor(videoWidth * c / cols), t: Math.floor(videoHeight * r / rows),
+                    r: Math.floor(videoWidth * (c + 1) / cols), b: Math.floor(videoHeight * (r + 1) / rows),
+                    manual: false
+                });
+            }
+        }
+        autoBoxes = boxes.map(b => ({ ...b }));
+        selected = 0;
         drawGrid();
+        renderAdjust();
     }
 
-    function autoDetectGrid() {
+    // ===== 純運算：在去背遮罩上偵測每個貼圖的範圍 =====
+    // 在 [start, end) 內平均分成 segments 段，並在每個預期分界附近找「前景最少的空白帶」當分界（取最長空白帶中央）
+    function findValleys(counts, start, end, segments) {
+        const bounds = [start];
+        const step = (end - start) / segments;
+        for (let i = 1; i < segments; i++) {
+            const expected = Math.round(start + step * i);
+            const half = Math.floor(step * 0.35);
+            const a = Math.max(start + 1, expected - half);
+            const b = Math.min(end - 1, expected + half);
+            if (a > b) { bounds.push(expected); continue; }
+
+            let minVal = Infinity;
+            for (let p = a; p <= b; p++) if (counts[p] < minVal) minVal = counts[p];
+            const thr = minVal + 2;
+
+            let bestStart = -1, bestLen = 0, runStart = -1;
+            for (let p = a; p <= b + 1; p++) {
+                const ok = p <= b && counts[p] <= thr;
+                if (ok && runStart < 0) runStart = p;
+                if (!ok && runStart >= 0) {
+                    const len = p - runStart;
+                    if (len > bestLen) { bestLen = len; bestStart = runStart; }
+                    runStart = -1;
+                }
+            }
+            bounds.push(bestStart < 0 ? expected : Math.round(bestStart + bestLen / 2));
+        }
+        bounds.push(end);
+        return bounds;
+    }
+
+    function activeRange(counts, from, to) {
+        let first = -1, last = -1;
+        for (let i = from; i < to; i++) {
+            if (counts[i] >= NOISE) { if (first < 0) first = i; last = i; }
+        }
+        return first < 0 ? null : [first, last + 1];
+    }
+
+    function cellBBox(mask, w, x0, y0, x1, y1, pad) {
+        const cw = x1 - x0, ch = y1 - y0;
+        if (cw <= 0 || ch <= 0) return { l: x0, t: y0, r: Math.max(x1, x0 + 1), b: Math.max(y1, y0 + 1), empty: true };
+        const cc = new Int32Array(cw), rc = new Int32Array(ch);
+        for (let y = y0; y < y1; y++) {
+            const row = y * w;
+            for (let x = x0; x < x1; x++) {
+                if (mask[row + x] < 128) { cc[x - x0]++; rc[y - y0]++; }
+            }
+        }
+        const xr = activeRange(cc, 0, cw), yr = activeRange(rc, 0, ch);
+        if (!xr || !yr) return { l: x0, t: y0, r: x1, b: y1, empty: true };
+        return {
+            l: Math.max(x0, x0 + xr[0] - pad), t: Math.max(y0, y0 + yr[0] - pad),
+            r: Math.min(x1, x0 + xr[1] + pad), b: Math.min(y1, y0 + yr[1] + pad)
+        };
+    }
+
+    // mask：255 = 背景（已去除）、其餘 = 貼圖主體。
+    // 流程：整張列投影切出 rows 個橫向區帶 → 每個區帶用欄投影切 cols 格 → 每格找主體的最小外接矩形（加上留白，不超出該格）
+    function detectBoxesFromMask(mask, w, h, pad, rows, cols) {
+        const rowCount = new Int32Array(h);
+        for (let y = 0; y < h; y++) {
+            let c = 0; const row = y * w;
+            for (let x = 0; x < w; x++) if (mask[row + x] < 128) c++;
+            rowCount[y] = c;
+        }
+        const rRange = activeRange(rowCount, 0, h) || [0, h];
+        const rBounds = findValleys(rowCount, rRange[0], rRange[1], rows);
+
+        const result = [];
+        for (let r = 0; r < rows; r++) {
+            const y0 = rBounds[r], y1 = rBounds[r + 1];
+            const colCount = new Int32Array(w);
+            for (let y = y0; y < y1; y++) {
+                const row = y * w;
+                for (let x = 0; x < w; x++) if (mask[row + x] < 128) colCount[x]++;
+            }
+            const cRange = activeRange(colCount, 0, w) || [0, w];
+            const cBounds = findValleys(colCount, cRange[0], cRange[1], cols);
+            for (let c = 0; c < cols; c++) result.push(cellBBox(mask, w, cBounds[c], y0, cBounds[c + 1], y1, pad));
+        }
+        return result;
+    }
+
+    const tick = () => new Promise(r => setTimeout(r, 0));
+
+    // 取影片中多個時間點，把「每個時間點有主體的位置」疊在一起，
+    // 這樣貼圖動起來（手舞足蹈）時，框也能涵蓋整段影片中的動作範圍。
+    async function autoDetectBoxes() {
+        if (!videoWidth || detecting) return;
         const rows = parseInt(document.getElementById('gridRows').value);
         const cols = parseInt(document.getElementById('gridCols').value);
         if (!rows || !cols) return;
 
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = videoWidth; tempCanvas.height = videoHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(video, 0, 0, videoWidth, videoHeight);
-        const imgData = tempCtx.getImageData(0, 0, videoWidth, videoHeight).data;
+        detecting = true;
+        const status = document.getElementById('status');
+        const wasPlaying = !video.paused, t0 = video.currentTime;
+        video.pause();
 
-        const targetColor = hexToRgb(document.getElementById('keyColor').value);
-        const tolerance = parseInt(document.getElementById('keyTolerance').value);
+        try {
+            const duration = getEffectiveDuration();
+            const SAMPLES = 10;
+            const scale = Math.min(1, 640 / Math.max(videoWidth, videoHeight));   // 縮小分析，加快速度
+            const aw = Math.max(8, Math.round(videoWidth * scale)), ah = Math.max(8, Math.round(videoHeight * scale));
+            const cv = document.createElement('canvas');
+            cv.width = aw; cv.height = ah;
+            const cx = cv.getContext('2d', { willReadFrequently: true });
 
-        const xDensity = new Array(videoWidth).fill(0);
-        const yDensity = new Array(videoHeight).fill(0);
+            const color = hexToRgb(document.getElementById('keyColor').value);
+            const tol = parseInt(document.getElementById('keyTolerance').value);
+            const expand = Math.round((parseInt(document.getElementById('expandPixels').value) || 0) * scale);
+            const padFull = Math.max(0, parseInt(document.getElementById('padPx').value) || 0);
 
-        for (let y = 0; y < videoHeight; y += 2) {
-            for (let x = 0; x < videoWidth; x += 2) {
-                const i = (y * videoWidth + x) * 4;
-                const diff = Math.sqrt(Math.pow(imgData[i]-targetColor.r,2)+Math.pow(imgData[i+1]-targetColor.g,2)+Math.pow(imgData[i+2]-targetColor.b,2));
-                if (diff >= tolerance && imgData[i+3] >= 20) { xDensity[x]++; yDensity[y]++; }
+            const union = new Uint8Array(aw * ah).fill(255);
+            for (let i = 0; i < SAMPLES; i++) {
+                status.innerText = `⏳ 正在分析影片、偵測貼圖範圍… (${i + 1}/${SAMPLES})`;
+                await seekToTime(duration * (i + 0.5) / SAMPLES);
+                cx.drawImage(video, 0, 0, aw, ah);
+                const img = cx.getImageData(0, 0, aw, ah);
+                const mask = new Uint8Array(aw * ah);
+                applyInitialKeying(img, mask, color, tol, expand);
+                for (let p = 0; p < mask.length; p++) if (mask[p] < 128) union[p] = 0;
+                await tick();
             }
-        }
 
-        let minX = xDensity.findIndex(v => v > 5), maxX = videoWidth - 1 - [...xDensity].reverse().findIndex(v => v > 5);
-        let minY = yDensity.findIndex(v => v > 5), maxY = videoHeight - 1 - [...yDensity].reverse().findIndex(v => v > 5);
+            const found = detectBoxesFromMask(union, aw, ah, Math.round(padFull * scale), rows, cols);
+            boxes = found.map(b => ({
+                l: clampN(Math.floor(b.l / scale), 0, videoWidth - MIN_BOX),
+                t: clampN(Math.floor(b.t / scale), 0, videoHeight - MIN_BOX),
+                r: clampN(Math.ceil(b.r / scale), MIN_BOX, videoWidth),
+                b: clampN(Math.ceil(b.b / scale), MIN_BOX, videoHeight),
+                manual: false
+            }));
+            boxes.forEach(b => { if (b.r - b.l < MIN_BOX) b.r = Math.min(videoWidth, b.l + MIN_BOX); if (b.b - b.t < MIN_BOX) b.b = Math.min(videoHeight, b.t + MIN_BOX); });
+            autoBoxes = boxes.map(b => ({ ...b }));
+            selected = 0;
 
-        if (minX !== -1 && maxX !== -1 && minY !== -1 && maxY !== -1) {
-            const padding = 10;
-            cropBox = {
-                left: Math.max(0, minX - padding),
-                top: Math.max(0, minY - padding),
-                right: Math.min(videoWidth, maxX + padding),
-                bottom: Math.min(videoHeight, maxY + padding)
-            };
-            verticalLines = findSplitLines(xDensity, cropBox.left, cropBox.right, cols);
-            horizontalLines = findSplitLines(yDensity, cropBox.top, cropBox.bottom, rows);
+            const empties = found.filter(b => b.empty).length;
+            status.innerText = empties
+                ? `⚠️ 有 ${empties} 格偵測不到貼圖主體，請確認去背顏色與容許值（可用滴管取色）`
+                : `✅ 已偵測 ${boxes.length} 個貼圖範圍，點選畫面上的框可微調`;
+        } catch (err) {
+            console.error(err);
+            status.innerText = '❌ 偵測失敗：' + err.message;
+        } finally {
+            detecting = false;
+            try { await seekToTime(t0); } catch (_) {}
+            if (wasPlaying && !pickMode) video.play();
             drawGrid();
+            renderAdjust();
         }
     }
 
-    function findSplitLines(densityArray, start, end, segments) {
-        const lines = []; const step = (end - start) / segments;
-        for (let i = 1; i < segments; i++) {
-            const expected = Math.floor(start + step * i);
-            const searchRange = Math.floor(step * 0.35);
-            let minDensity = Infinity, bestPos = expected;
-            for (let pos = expected - searchRange; pos <= expected + searchRange; pos++) {
-                if (pos >= 0 && pos < densityArray.length && densityArray[pos] < minDensity) {
-                    minDensity = densityArray[pos]; bestPos = pos;
-                }
-            }
-            lines.push(bestPos);
-        }
-        return lines;
-    }
+    function clampN(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+    // ===== 在畫面上畫出每個貼圖的範圍框 =====
     function drawGrid() {
         ctx.clearRect(0, 0, overlay.width, overlay.height);
+        if (!boxes.length) return;
         const rectW = overlay.getBoundingClientRect().width;
-        const k = rectW > 0 && videoWidth ? videoWidth / rectW : 1; // 每個螢幕像素對應的影片像素
-        ctx.strokeStyle = '#818cf8'; ctx.setLineDash([6 * k, 6 * k]); ctx.lineWidth = 2 * k;
-        ctx.strokeRect(cropBox.left, cropBox.top, cropBox.right - cropBox.left, cropBox.bottom - cropBox.top);
-        ctx.strokeStyle = '#38bdf8'; ctx.setLineDash([]); ctx.lineWidth = 1.5 * k;
-        verticalLines.forEach(x => { ctx.beginPath(); ctx.moveTo(x, cropBox.top); ctx.lineTo(x, cropBox.bottom); ctx.stroke(); });
-        horizontalLines.forEach(y => { ctx.beginPath(); ctx.moveTo(cropBox.left, y); ctx.lineTo(cropBox.right, y); ctx.stroke(); });
+        const k = rectW > 0 && videoWidth ? videoWidth / rectW : 1;   // 每個螢幕像素對應的影片像素
+        ctx.font = `bold ${13 * k}px sans-serif`;
+        ctx.textBaseline = 'top';
+
+        boxes.forEach((b, i) => {
+            const isSel = i === selected;
+            const color = isSel ? '#FF2E93' : `hsl(${(i * 47) % 360}, 90%, 62%)`;
+            const w = b.r - b.l, h = b.b - b.t;
+            if (isSel) { ctx.fillStyle = 'rgba(255, 46, 147, 0.14)'; ctx.fillRect(b.l, b.t, w, h); }
+            ctx.strokeStyle = color;
+            ctx.lineWidth = (isSel ? 3.5 : 2) * k;
+            ctx.setLineDash(isSel ? [] : [6 * k, 4 * k]);
+            ctx.strokeRect(b.l, b.t, w, h);
+            ctx.setLineDash([]);
+
+            const label = `${i + 1}${b.manual ? '✎' : ''}`;
+            const tw = ctx.measureText(label).width + 8 * k, th = 18 * k;
+            ctx.fillStyle = color;
+            ctx.fillRect(b.l, b.t, tw, th);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(label, b.l + 4 * k, b.t + 2 * k);
+        });
+    }
+
+    // ===== 手動微調 =====
+    function selectSticker(i) {
+        if (!boxes.length) return;
+        selected = (i + boxes.length) % boxes.length;
+        drawGrid();
+        renderAdjust();
+    }
+    function selectRelative(d) { selectSticker(selected + d); }
+
+    function selectBoxAt(clientX, clientY) {
+        const rect = overlay.getBoundingClientRect();
+        const x = (clientX - rect.left) * (videoWidth / rect.width);
+        const y = (clientY - rect.top) * (videoHeight / rect.height);
+        let best = -1, bestArea = Infinity;
+        boxes.forEach((b, i) => {
+            if (x >= b.l && x <= b.r && y >= b.t && y <= b.b) {
+                const area = (b.r - b.l) * (b.b - b.t);
+                if (area < bestArea) { bestArea = area; best = i; }
+            }
+        });
+        if (best >= 0) selectSticker(best);
+    }
+
+    function adjustEdge(edge, delta) {   // delta > 0 往外擴、< 0 往內縮
+        const b = boxes[selected]; if (!b) return;
+        if (edge === 'top')    b.t = clampN(b.t - delta, 0, b.b - MIN_BOX);
+        if (edge === 'bottom') b.b = clampN(b.b + delta, b.t + MIN_BOX, videoHeight);
+        if (edge === 'left')   b.l = clampN(b.l - delta, 0, b.r - MIN_BOX);
+        if (edge === 'right')  b.r = clampN(b.r + delta, b.l + MIN_BOX, videoWidth);
+        b.manual = true;
+        drawGrid(); renderAdjust();
+    }
+
+    function moveBox(dx, dy) {
+        const b = boxes[selected]; if (!b) return;
+        const w = b.r - b.l, h = b.b - b.t;
+        b.l = clampN(b.l + dx, 0, videoWidth - w); b.r = b.l + w;
+        b.t = clampN(b.t + dy, 0, videoHeight - h); b.b = b.t + h;
+        b.manual = true;
+        drawGrid(); renderAdjust();
+    }
+
+    function redetectOne() {
+        if (!autoBoxes[selected]) return;
+        boxes[selected] = { ...autoBoxes[selected], manual: false };
+        drawGrid(); renderAdjust();
+    }
+
+    function renderAdjust() {
+        const panel = document.getElementById('adjustPanel');
+        const b = boxes[selected];
+        if (!b) { panel.style.display = 'none'; return; }
+        panel.style.display = 'flex';
+        document.getElementById('adjLabel').innerText = `第 ${selected + 1} 張${b.manual ? '（已手動調整）' : ''}`;
+        document.getElementById('adjSize').innerText = `${b.r - b.l} × ${b.b - b.t} px　位置 (${b.l}, ${b.t})`;
+        drawLive();
+    }
+
+    // 即時顯示目前選取貼圖的裁切範圍（跟著影片播放）
+    function drawLive() {
+        const b = boxes[selected];
+        const cv = document.getElementById('adjLive');
+        if (!b || !cv || !video.videoWidth || video.readyState < 2) return;
+        const w = b.r - b.l, h = b.b - b.t;
+        if (cv.width !== w) cv.width = w;
+        if (cv.height !== h) cv.height = h;
+        const c = cv.getContext('2d');
+        c.clearRect(0, 0, w, h);
+        c.drawImage(video, b.l, b.t, w, h, 0, 0, w, h);
+    }
+
+    let adjustPanelReady = false;
+    function setupAdjustPanel() {
+        if (adjustPanelReady) return;
+        adjustPanelReady = true;
+
+        document.getElementById('stepSeg').querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+            stepSize = parseInt(btn.dataset.step);
+            document.getElementById('stepSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === btn));
+        }));
+
+        // 按住按鈕可連續調整
+        document.querySelectorAll('#adjustPanel [data-act]').forEach(btn => {
+            let delayTimer = null, repeatTimer = null;
+            const fire = () => {
+                if (btn.dataset.act === 'edge') adjustEdge(btn.dataset.edge, parseInt(btn.dataset.dir) * stepSize);
+                else moveBox(parseInt(btn.dataset.dx) * stepSize, parseInt(btn.dataset.dy) * stepSize);
+            };
+            const stop = () => { clearTimeout(delayTimer); clearInterval(repeatTimer); delayTimer = repeatTimer = null; };
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                fire();
+                delayTimer = setTimeout(() => { repeatTimer = setInterval(fire, 70); }, 350);
+            });
+            ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
+            btn.addEventListener('contextmenu', (e) => e.preventDefault());
+        });
+
+        setInterval(drawLive, 120);
     }
 
     // ===== 畫面縮放 / 平移 =====
@@ -709,12 +1011,8 @@
         const viewport = document.getElementById('stageViewport');
         let pinch = null;      // { dist, mx, my }
         let panning = null;    // { x, y }
-        let pickStart = null;  // 滴管：記錄點擊起點，判斷是點一下還是拖曳
+        let tap = null;        // 記錄點擊起點：沒有拖曳就視為「點一下」（取色 / 選取貼圖框）
 
-        const getCanvasPos = (clientX, clientY) => {
-            const rect = overlay.getBoundingClientRect();
-            return { x: (clientX - rect.left) * (videoWidth / rect.width), y: (clientY - rect.top) * (videoHeight / rect.height) };
-        };
         const pinchInfo = (e) => {
             const a = e.touches[0], b = e.touches[1];
             return { dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2 };
@@ -722,32 +1020,14 @@
 
         const onStart = (e) => {
             if (e.touches && e.touches.length >= 2) {
-                draggingTarget = null; panning = null; pickStart = null;
+                panning = null; tap = null;
                 pinch = pinchInfo(e);
                 return;
             }
             const cx = e.touches ? e.touches[0].clientX : e.clientX;
             const cy = e.touches ? e.touches[0].clientY : e.clientY;
-            if (pickMode) {
-                pickStart = { x: cx, y: cy, moved: false };
-                draggingTarget = null;
-                if (stageZoom > 1) panning = { x: cx, y: cy };
-                return;
-            }
-            const { x, y } = getCanvasPos(cx, cy);
-            // 點擊判定範圍固定約 26 個螢幕像素（放大後會自動變精細）
-            const tol = 26 * (videoWidth / overlay.getBoundingClientRect().width);
-            draggingTarget = null;
-            if (Math.abs(x - cropBox.left) < tol) draggingTarget = { type: 'cropL' };
-            else if (Math.abs(x - cropBox.right) < tol) draggingTarget = { type: 'cropR' };
-            else if (Math.abs(y - cropBox.top) < tol) draggingTarget = { type: 'cropT' };
-            else if (Math.abs(y - cropBox.bottom) < tol) draggingTarget = { type: 'cropB' };
-            else {
-                for (let i = 0; i < verticalLines.length; i++) if (Math.abs(x - verticalLines[i]) < tol) { draggingTarget = { type: 'vLine', index: i }; return; }
-                for (let j = 0; j < horizontalLines.length; j++) if (Math.abs(y - horizontalLines[j]) < tol) { draggingTarget = { type: 'hLine', index: j }; return; }
-            }
-            // 沒點到線，且已放大 → 單指平移畫面
-            if (!draggingTarget && stageZoom > 1) panning = { x: cx, y: cy };
+            tap = { x: cx, y: cy, moved: false };
+            if (stageZoom > 1) panning = { x: cx, y: cy };   // 放大後，單指拖曳可平移畫面
         };
 
         const onMove = (e) => {
@@ -761,34 +1041,21 @@
             }
             const cx = e.touches ? e.touches[0].clientX : e.clientX;
             const cy = e.touches ? e.touches[0].clientY : e.clientY;
-            if (pickStart && Math.hypot(cx - pickStart.x, cy - pickStart.y) > 8) pickStart.moved = true;
+            if (tap && Math.hypot(cx - tap.x, cy - tap.y) > 8) tap.moved = true;
             if (panning) {
                 stagePan.x += cx - panning.x;
                 stagePan.y += cy - panning.y;
                 panning = { x: cx, y: cy };
                 applyStageTransform();
-                return;
             }
-            if (!draggingTarget) return;
-            const { x, y } = getCanvasPos(cx, cy);
-            if (draggingTarget.type === 'cropL') cropBox.left = Math.min(Math.max(0, x), cropBox.right - 10);
-            else if (draggingTarget.type === 'cropR') cropBox.right = Math.max(Math.min(videoWidth, x), cropBox.left + 10);
-            else if (draggingTarget.type === 'cropT') cropBox.top = Math.min(Math.max(0, y), cropBox.bottom - 10);
-            else if (draggingTarget.type === 'cropB') cropBox.bottom = Math.max(Math.min(videoHeight, y), cropBox.top + 10);
-            else if (draggingTarget.type === 'vLine') verticalLines[draggingTarget.index] = Math.min(Math.max(cropBox.left, x), cropBox.right);
-            else if (draggingTarget.type === 'hLine') horizontalLines[draggingTarget.index] = Math.min(Math.max(cropBox.top, y), cropBox.bottom);
-            drawGrid();
         };
 
-        const onEnd = (e) => {
-            if (pickStart && !pinch && !pickStart.moved) pickColorAt(pickStart.x, pickStart.y);
-            pickStart = null;
-            if (e && e.touches && e.touches.length === 1 && pinch) {
-                // 雙指放開其中一指：結束縮放，避免畫面跳動
-                pinch = null; panning = null; draggingTarget = null;
-                return;
+        const onEnd = () => {
+            if (tap && !pinch && !tap.moved) {
+                if (pickMode) pickColorAt(tap.x, tap.y);
+                else selectBoxAt(tap.x, tap.y);
             }
-            pinch = null; panning = null; draggingTarget = null;
+            tap = null; pinch = null; panning = null;
         };
 
         overlay.addEventListener('mousedown', onStart);
@@ -875,8 +1142,7 @@
         const duration = getEffectiveDuration();
         const maxFrames = getFrameCount();
         const totalFrames = maxFrames;
-        const vBounds = [cropBox.left, ...verticalLines, cropBox.right];
-        const hBounds = [cropBox.top, ...horizontalLines, cropBox.bottom];
+        if (boxes.length !== rows * cols) initGridLines();   // 行列數改過但還沒偵測：先以等分的框為準
 
         const enableKeying = document.getElementById('enableKeying').checked;
         const targetColor = hexToRgb(document.getElementById('keyColor').value);
@@ -889,9 +1155,10 @@
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const id = r * cols + c + 1;
-                const sx = Math.floor(vBounds[c]), sy = Math.floor(hBounds[r]);
-                const cellW = Math.floor(vBounds[c + 1] - vBounds[c]);
-                const cellH = Math.floor(hBounds[r + 1] - hBounds[r]);
+                const bx = boxes[id - 1];
+                const sx = Math.floor(bx.l), sy = Math.floor(bx.t);
+                const cellW = Math.floor(bx.r - bx.l);
+                const cellH = Math.floor(bx.b - bx.t);
 
                 const workCanvas = document.createElement('canvas');
                 workCanvas.width = cellW; workCanvas.height = cellH;
