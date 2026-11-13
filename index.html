@@ -151,8 +151,8 @@
         /* 畫布檢視區 */
         .preview-box-wrapper { width: 100%; flex-shrink: 0; }
         .preview-box {
-            position: relative; width: 100%; height: 260px;
-            border-radius: var(--radius-md); overflow: hidden; background: #020617;
+            position: relative; width: 100%; flex: 1; min-height: 140px;
+            border-radius: 0; overflow: hidden; background: #020617;
             touch-action: none; display: flex; align-items: center; justify-content: center;
             border: 1px solid var(--border);
         }
@@ -170,7 +170,31 @@
 
         .mode-badge { position: absolute; top: 8px; left: 8px; background: rgba(15,23,42,0.85); color: #38bdf8; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; border: 1px solid #334155; }
 
-        #previewCanvas { transform-origin: center center; max-width: 100%; max-height: 100%; object-fit: contain; }
+        #previewCanvas { transform-origin: center center; max-width: none; max-height: none; flex-shrink: 0; }
+
+        /* 逐張編輯（全螢幕：上方圖片、下方操作區） */
+        #editorModal { height: 100vh; height: 100dvh; }
+        .ed-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: #0f172a; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .ed-nav button { min-height: 46px; border: 1px solid var(--border); background: #1e293b; color: #e2e8f0; border-radius: 10px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+        .ed-banner { position: absolute; left: 8px; top: 8px; right: 160px; z-index: 6; background: #dc2626; color: #fff; font-weight: 800; font-size: 0.88rem; padding: 8px 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.4); line-height: 1.35; display: none; pointer-events: none; }
+        .ed-zoom { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 7; }
+        .ed-zoom button { width: 46px; height: 44px; border: 1px solid rgba(255,255,255,.3); background: rgba(15,23,42,.85); color: #fff; border-radius: 10px; font-weight: 800; font-size: 1.05rem; cursor: pointer; }
+        #previewContainer .bg-toggles { top: auto; bottom: 8px; right: auto; left: 8px; }
+        .ed-panel { flex-shrink: 0; padding: 10px 12px; background: #0f172a; max-height: 44vh; max-height: 44dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .ed-modes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .ed-modes button { min-height: 58px; border: 1px solid var(--border); background: #1e293b; color: #cbd5e1; border-radius: 10px; font-size: 0.78rem; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 4px 2px; line-height: 1.15; }
+        .ed-modes button .ic { font-size: 1.25rem; }
+        .ed-modes button.active { background: #7f1d1d; border-color: #ef4444; color: #fff; }
+        .ed-modes button[data-mode="view"].active { background: #1e3a5f; border-color: #38bdf8; }
+        .ed-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .ed-actions button { min-height: 52px; border: 1px solid var(--border); background: #1e293b; color: #e2e8f0; border-radius: 10px; font-size: 0.9rem; font-weight: 700; cursor: pointer; padding: 4px 6px; line-height: 1.2; }
+        .ed-actions button.danger { color: #fca5a5; }
+        .ed-actions button:active { background: #312e81; }
+        .ed-hint { font-size: 0.82rem; color: #94a3b8; line-height: 1.45; }
+        .ed-adv { border: 1px solid #243049; border-radius: 10px; padding: 8px 10px; background: #111a2e; }
+        .ed-adv summary { font-size: 0.9rem; font-weight: 700; color: #cbd5e1; cursor: pointer; min-height: 34px; display: flex; align-items: center; }
+        .ed-adv .adv-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 0.9rem; font-weight: 600; flex-wrap: wrap; }
+        .ed-adv input[type="range"] { flex: 1; min-width: 120px; height: 30px; accent-color: var(--primary); }
 
         /* 手機表單與控制控制項 */
         .mobile-controls { display: flex; flex-direction: column; gap: 12px; }
@@ -396,75 +420,73 @@
     </div>
 </div>
 
-<!-- 📱 全螢幕手機專用 Modal -->
+<!-- 📱 全螢幕：逐張編輯（去背修飾 / 文字樣式） -->
 <div class="modal-overlay" id="editorModal">
     <div class="modal-header">
-        <span id="modalTitle" style="font-weight:bold; font-size:0.95rem;">編輯貼圖</span>
-        <button onclick="closeModal()" style="border:none; background:transparent; color:#94a3b8; font-size:1.4rem; padding:4px 8px;">✕</button>
+        <span style="font-weight:bold; font-size:0.95rem;"><span id="modalTitle">編輯貼圖</span><span id="frameDisplay" style="margin-left:8px; font-size:0.8rem; color:#94a3b8; font-weight:600;">影格 1 / -</span></span>
+        <button onclick="closeModal()" style="border:none; background:transparent; color:#94a3b8; font-size:1.6rem; padding:4px 10px;">✕</button>
     </div>
 
-    <!-- 頁籤分頁導覽 -->
+    <div class="ed-nav">
+        <button onclick="changeFrame(-1)">◀ 上一幀</button>
+        <button id="btnPlay" onclick="togglePlay()">▶ 播放</button>
+        <button onclick="changeFrame(1)">下一幀 ▶</button>
+    </div>
+
+    <!-- 圖片固定在上半部 -->
+    <div class="preview-box bg-dark" id="previewContainer">
+        <div class="ed-banner" id="edBanner"></div>
+        <div id="boxSelectOverlay" style="position:absolute; display:none; border:2px dashed #38bdf8; background:rgba(56,189,248,0.18); pointer-events:none; z-index:5;"></div>
+        <div class="ed-zoom">
+            <button onclick="edZoomBtn(1/1.5)" aria-label="縮小">－</button>
+            <button onclick="edZoomBtn(1.5)" aria-label="放大">＋</button>
+            <button onclick="edFit()" aria-label="重新置中">⟲</button>
+        </div>
+        <div class="bg-toggles">
+            <button class="bg-toggle-btn" onclick="setBg('light', this)">☀️</button>
+            <button class="bg-toggle-btn active" onclick="setBg('dark', this)">🌙</button>
+            <button class="bg-toggle-btn" onclick="setBg('grid', this)">🏁</button>
+        </div>
+        <canvas id="previewCanvas"></canvas>
+    </div>
+
+    <!-- 操作區固定在下半部 -->
     <div class="tab-bar">
-        <button class="tab-btn active" id="tabBtnPreview" onclick="switchTab('preview')">🖼️ 畫布與動作</button>
-        <button class="tab-btn" id="tabBtnText" onclick="switchTab('text')">✍️ 文字與樣式</button>
+        <button class="tab-btn active" id="tabBtnPreview" onclick="switchTab('preview')">🪄 去背修飾</button>
+        <button class="tab-btn" id="tabBtnText" onclick="switchTab('text')">✍️ 文字樣式</button>
     </div>
 
-    <div class="modal-body-scroll">
-        <!-- 畫布區 (永遠放在最上方，便利手勢操作) -->
-        <div class="preview-box-wrapper">
-            <div class="preview-box bg-dark" id="previewContainer">
-                <div class="mode-badge" id="modeBadge">🪄 點擊去背模式</div>
-                <div id="boxSelectOverlay" style="position:absolute; display:none; border:2px dashed #38bdf8; background:rgba(56,189,248,0.18); pointer-events:none; z-index:5;"></div>
-
-                <div class="bg-toggles">
-                    <button class="bg-toggle-btn" onclick="setBg('light', this)">☀️</button>
-                    <button class="bg-toggle-btn active" onclick="setBg('dark', this)">🌙</button>
-                    <button class="bg-toggle-btn" onclick="setBg('grid', this)">🏁</button>
-                </div>
-
-                <canvas id="previewCanvas"></canvas>
-            </div>
-        </div>
-
-        <!-- 分頁 1: 畫布控制與影格工具 -->
+    <div class="ed-panel">
+        <!-- 分頁 1: 去背修飾 -->
         <div class="mobile-controls" id="tabContentPreview">
-            <div class="panel-section-title">🎬 影格播放控制</div>
-            <div class="frame-stepper">
-                <button class="step-btn" onclick="changeFrame(-1)">&lt; 上一幀</button>
-                <span class="frame-indicator" id="frameDisplay">影格 1 / -</span>
-                <button class="step-btn" onclick="changeFrame(1)">下一幀 &gt;</button>
+            <div class="ed-modes" id="edModes">
+                <button data-mode="view" class="active"><span class="ic">🖐</span><span>檢視</span></button>
+                <button data-mode="wand"><span class="ic">🪄</span><span>點擊去背</span></button>
+                <button data-mode="restore"><span class="ic">↩</span><span>點擊還原</span></button>
+                <button data-mode="boxRemove"><span class="ic">▭</span><span>框選去背</span></button>
+                <button data-mode="boxRestore"><span class="ic">▭</span><span>框選還原</span></button>
             </div>
-
-            <div class="tool-row">
-                <button class="btn-outline active" id="btnModeToggle" onclick="toggleInteractionMode()">🪄 去背模式</button>
-                <button class="btn-outline" id="btnPlay" onclick="togglePlay()">⊙ 播放預覽</button>
+            <div class="ed-actions">
+                <button onclick="undoLastAction()">↺ 復原上一步</button>
+                <button class="danger" onclick="deleteCurrentFrame()">🗑️ 刪除此影格</button>
             </div>
-
-            <div class="tool-row">
-                <button class="btn-outline btn-danger" onclick="deleteCurrentFrame()">🗑️ 刪除此影格</button>
-                <button class="btn-outline" onclick="undoLastAction()">↺ 上一步</button>
-            </div>
-
-            <div class="slider-item">
-                <span style="font-size:0.8rem;">容許值</span>
-                <input type="range" id="modalTolRange" min="5" max="120" value="30" oninput="document.getElementById('mTolVal').innerText=this.value;">
-                <span id="mTolVal" style="width:24px; font-size:0.8rem;">30</span>
-            </div>
-
-            <!-- 🌟 個別編輯視窗內的強制外擴設定 -->
-            <div class="slider-item" style="margin-top: 4px;">
-                <span style="font-size:0.8rem;">強制外擴像素</span>
-                <input type="number" id="modalExpandPixels" class="grid-input" style="width:60px; height:34px; font-size:0.9rem;" min="0" max="20" value="1">
-                <span style="font-size:0.75rem; color:#94a3b8;">格</span>
-            </div>
-
-            <div style="display:flex; align-items:center; gap:8px;">
-                <input type="checkbox" id="boxInverseMode" style="width:18px; height:18px;">
-                <label for="boxInverseMode" style="font-size:0.8rem;">框選還原（取消去背，找回被吃掉的主體）</label>
-            </div>
+            <details class="ed-adv">
+                <summary>⚙️ 進階設定</summary>
+                <div class="adv-row">
+                    <span>點選容許值</span>
+                    <input type="range" id="modalTolRange" min="5" max="120" value="30" oninput="document.getElementById('mTolVal').innerText=this.value;">
+                    <span id="mTolVal" style="width:28px; text-align:right;">30</span>
+                </div>
+                <div class="adv-row">
+                    <span>點擊去背外擴</span>
+                    <input type="number" id="modalExpandPixels" class="grid-input" style="width:64px; height:40px;" min="0" max="20" value="0">
+                    <span style="font-size:0.78rem; color:var(--text-muted);">像素（只往被點到的那一塊周圍擴）</span>
+                </div>
+            </details>
+            <div class="ed-hint" id="edHint">🖐 檢視模式：可以放心縮放、拖曳畫面，不會改到圖片。要去背請先選上面的工具。（修改只作用在目前這一格影格）</div>
         </div>
 
-        <!-- 分頁 2: 文字編輯 -->
+        <!-- 分頁 2: 文字樣式 -->
         <div class="mobile-controls" id="tabContentText" style="display:none;">
             <div class="panel-section-title">✍️ 貼圖文字設計</div>
 
@@ -524,8 +546,8 @@
     </div>
 
     <div class="footer-bar">
-        <button class="btn-outline" style="width:100px;" onclick="closeModal()">取消</button>
-        <button class="btn" style="flex:1;" onclick="saveModalChanges()">✓ 完成修復</button>
+        <button class="btn-outline" style="width:100px; min-height:52px;" onclick="closeModal()">取消</button>
+        <button class="btn" style="flex:1; min-height:52px;" onclick="saveModalChanges()">✓ 完成修復</button>
     </div>
 </div>
 
@@ -588,17 +610,21 @@
     let isDraggingText = false;
     let zoomScale = 1;
     let panOffset = { x: 0, y: 0 };
-    let currentMode = 'wand';
+    let currentMode = 'view';   // view = 檢視（預設，不會改到圖片）
     let initialPinchDistance = null;
     let boxSelecting = false;
     let boxSelectStartClient = null;
     let boxSelectCurrentClient = null;
 
+    let edTab = 'preview';
     function switchTab(tab) {
+        edTab = tab;
+        currentMode = 'view';   // 每次切換分頁都回到「檢視」，避免誤點
         document.getElementById('tabBtnPreview').classList.toggle('active', tab === 'preview');
         document.getElementById('tabBtnText').classList.toggle('active', tab === 'text');
         document.getElementById('tabContentPreview').style.display = tab === 'preview' ? 'flex' : 'none';
         document.getElementById('tabContentText').style.display = tab === 'text' ? 'flex' : 'none';
+        updateEdUI();
     }
 
     function loadVideo(e) {
@@ -1635,13 +1661,13 @@
 
         document.getElementById('modalTitle').innerText = `編輯貼圖 #${id}`;
         document.getElementById('editorModal').style.display = 'flex';
+        setupInteractiveCanvas();
         switchTab('preview');
-        resetZoom();
         boxSelecting = false;
         const boxOverlay = document.getElementById('boxSelectOverlay');
         if (boxOverlay) boxOverlay.style.display = 'none';
         renderModalFrame();
-        setupInteractiveCanvas();
+        edFit();
     }
 
     function syncUIWithStickerTextConfig(cfg) {
@@ -1676,6 +1702,7 @@
 
     function closeModal() {
         if (isPlaying) togglePlay();
+        currentMode = 'view';
         document.getElementById('editorModal').style.display = 'none';
     }
 
@@ -1734,14 +1761,14 @@
         const sticker = stickerDataMap[activeEditingStickerId];
         const frames = sticker.frames;
         if (isPlaying) {
-            btn.innerText = "⏸ 暫停預覽";
+            btn.innerText = "⏸ 暫停";
             const delay = sticker.frameDelayMs || (1000 / 15);
             playInterval = setInterval(() => {
                 currentModalFrame = (currentModalFrame + 1) % frames.length;
                 renderModalFrame();
             }, delay);
         } else {
-            btn.innerText = "⊙ 播放預覽";
+            btn.innerText = "▶ 播放";
             clearInterval(playInterval);
         }
     }
@@ -1760,6 +1787,7 @@
         renderSingleFrameToCanvas(ctx, sticker, currentModalFrame);
 
         document.getElementById('frameDisplay').innerText = `影格 ${currentModalFrame + 1} / ${sticker.frames.length}`;
+        fitPreviewCanvas();
         updateCanvasTransform();
     }
 
@@ -1841,110 +1869,181 @@
         };
     }
 
-    function setupInteractiveCanvas() {
-        const container = document.getElementById('previewContainer');
+    // =====================================================================
+    // 逐張編輯：圖片固定在上半部、操作區固定在下半部
+    // =====================================================================
+    let edReady = false;
+    const edPtrs = new Map();
+    let edGesture = null, edPinch = null;
+    const ED_MODE_INFO = {
+        view:       { banner: '', hint: '🖐 檢視模式：可以放心縮放、拖曳畫面，不會改到圖片。要去背請先選上面的工具。（修改只作用在目前這一格影格）' },
+        wand:       { banner: '🪄 點擊去背中：點圖片上「還看得到」的地方會被去除', hint: '點圖片上殘留的背景，只會去除被點到、相連且顏色相近的那一塊，已經透明的外圍不會被動到。拖曳可移動畫面。' },
+        restore:    { banner: '↩ 點擊還原中：點透明的地方會找回來', hint: '點被誤去除、已經變透明的地方，會找回相連且顏色相近的那一塊。' },
+        boxRemove:  { banner: '▭ 框選去背中：拖曳畫出矩形，範圍內會被去除', hint: '用手指拖曳出矩形，範圍內全部去除。兩指可以縮放、移動畫面。' },
+        boxRestore: { banner: '▭ 框選還原中：拖曳畫出矩形，範圍內會被找回', hint: '用手指拖曳出矩形，範圍內全部還原。兩指可以縮放、移動畫面。' }
+    };
+    let edHintLocked = false;   // 做完動作後，先顯示「做了什麼」，直到切換模式
 
-        const handleStart = (e) => {
-            if (e.touches && e.touches.length === 2) {
-                initialPinchDistance = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                return;
-            }
+    function setEdHint(text) { document.getElementById('edHint').textContent = text; edHintLocked = true; }
 
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-            const sticker = stickerDataMap[activeEditingStickerId];
-            const cfg = sticker.textConfig;
-
-            if (currentMode !== 'box' && cfg.text) {
-                const p = getExactCanvasCoords(clientX, clientY);
-                const distToText = Math.hypot(p.x - cfg.x, p.y - cfg.y);
-                if (distToText < 35) {
-                    isDraggingText = true;
-                    return;
-                }
-            }
-
-            if (currentMode === 'wand') {
-                const p = getExactCanvasCoords(clientX, clientY);
-                executeMagicWand(p.x, p.y);
-            } else if (currentMode === 'box') {
-                boxSelecting = true;
-                boxSelectStartClient = { x: clientX, y: clientY };
-                boxSelectCurrentClient = { x: clientX, y: clientY };
-                const boxOverlay = document.getElementById('boxSelectOverlay');
-                boxOverlay.style.display = 'block';
-                updateBoxOverlay();
-            }
-        };
-
-        const handleMove = (e) => {
-            if (e.touches && e.touches.length === 2 && initialPinchDistance) {
-                const dist = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                const factor = dist / initialPinchDistance;
-                zoomScale = Math.min(Math.max(0.8, zoomScale * factor), 5);
-                initialPinchDistance = dist;
-                updateCanvasTransform();
-                return;
-            }
-
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-            if (boxSelecting) {
-                boxSelectCurrentClient = { x: clientX, y: clientY };
-                updateBoxOverlay();
-                return;
-            }
-
-            if (isDraggingText) {
-                const p = getExactCanvasCoords(clientX, clientY);
-                const sticker = stickerDataMap[activeEditingStickerId];
-                sticker.textConfig.x = p.x;
-                sticker.textConfig.y = p.y;
-                renderModalFrame();
-            }
-        };
-
-        const handleEnd = () => {
-            if (boxSelecting) {
-                applyBoxSelection(boxSelectStartClient.x, boxSelectStartClient.y, boxSelectCurrentClient.x, boxSelectCurrentClient.y);
-                boxSelecting = false;
-                document.getElementById('boxSelectOverlay').style.display = 'none';
-            }
-            isDraggingText = false;
-            initialPinchDistance = null;
-        };
-
-        container.onmousedown = handleStart;
-        window.onmousemove = handleMove;
-        window.onmouseup = handleEnd;
-
-        container.ontouchstart = handleStart;
-        window.ontouchmove = handleMove;
-        window.ontouchend = handleEnd;
+    function setEditMode(mode) {
+        if (isPlaying) togglePlay();
+        currentMode = mode;
+        edHintLocked = false;
+        updateEdUI();
     }
 
-    // 僅在「去背模式」與「框選模式」之間切換
-    function toggleInteractionMode() {
-        const btn = document.getElementById('btnModeToggle');
-        const badge = document.getElementById('modeBadge');
-        if (currentMode === 'wand') {
-            currentMode = 'box';
-            btn.innerText = "▭ 框選模式";
-            badge.innerText = "▭ 框選去背模式";
-        } else {
-            currentMode = 'wand';
-            btn.innerText = "🪄 去背模式";
-            badge.innerText = "🪄 點擊去背模式";
-        }
-        btn.classList.add('active');
+    function updateEdUI() {
+        document.querySelectorAll('#edModes button').forEach(b => b.classList.toggle('active', b.dataset.mode === currentMode));
+        const info = ED_MODE_INFO[currentMode];
+        const banner = document.getElementById('edBanner');
+        banner.style.display = (edTab === 'preview' && info.banner) ? 'block' : 'none';
+        banner.textContent = info.banner;
+        if (!edHintLocked) document.getElementById('edHint').textContent = info.hint;
+    }
+
+    // 讓圖片剛好放進上半部的視窗
+    function fitPreviewCanvas() {
+        const c = document.getElementById('previewCanvas'), box = document.getElementById('previewContainer');
+        const cw = box.clientWidth, ch = box.clientHeight;
+        if (!cw || !ch || !c.width || !c.height) return;
+        const s = Math.min((cw - 16) / c.width, (ch - 16) / c.height);
+        c.style.width = Math.max(10, Math.round(c.width * s)) + 'px';
+        c.style.height = Math.max(10, Math.round(c.height * s)) + 'px';
+        c.style.imageRendering = (s * zoomScale > 3) ? 'pixelated' : 'auto';
+    }
+
+    function edFit() { zoomScale = 1; panOffset = { x: 0, y: 0 }; fitPreviewCanvas(); updateCanvasTransform(); }
+
+    function edZoomAt(f, mx, my) {
+        const r = document.getElementById('previewContainer').getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const nz = clampN(zoomScale * f, 0.5, 12), ff = nz / zoomScale;
+        panOffset.x += (1 - ff) * (mx - cx - panOffset.x);
+        panOffset.y += (1 - ff) * (my - cy - panOffset.y);
+        zoomScale = nz;
+        fitPreviewCanvas();
+        updateCanvasTransform();
+    }
+
+    function edZoomBtn(f) {
+        const r = document.getElementById('previewContainer').getBoundingClientRect();
+        edZoomAt(f, r.left + r.width / 2, r.top + r.height / 2);
+    }
+
+    function setupInteractiveCanvas() {
+        if (edReady) return;
+        edReady = true;
+        const container = document.getElementById('previewContainer');
+
+        // 點圖片上的工具列（縮放、背景切換）不要當成圖片上的操作
+        const onUI = (e) => !!e.target.closest('.ed-zoom, .bg-toggles');
+
+        const startGesture = (p) => {
+            if (isPlaying) togglePlay();
+            const sticker = stickerDataMap[activeEditingStickerId];
+            if (!sticker) return;
+            const cfg = sticker.textConfig;
+            if (edTab === 'text') {
+                if (cfg.text) {
+                    const q = getExactCanvasCoords(p.x, p.y);
+                    if (Math.hypot(q.x - cfg.x, q.y - cfg.y) < 35) { edGesture = { type: 'text' }; return; }
+                }
+                edGesture = { type: 'pan', lx: p.x, ly: p.y };
+            } else if (currentMode === 'view') {
+                edGesture = { type: 'pan', lx: p.x, ly: p.y };
+            } else if (currentMode === 'wand' || currentMode === 'restore') {
+                edGesture = { type: 'tap', sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: false };   // 點一下才動作；拖曳則是移動畫面
+            } else {
+                edGesture = { type: 'sel', sx: p.x, sy: p.y };
+                boxSelecting = true;
+                boxSelectStartClient = { x: p.x, y: p.y };
+                boxSelectCurrentClient = { x: p.x, y: p.y };
+                document.getElementById('boxSelectOverlay').style.display = 'block';
+                updateBoxOverlay();
+            }
+        };
+
+        container.addEventListener('pointerdown', (e) => {
+            if (onUI(e) || !activeEditingStickerId) return;
+            e.preventDefault();
+            try { container.setPointerCapture(e.pointerId); } catch (_) {}
+            const p = { x: e.clientX, y: e.clientY };
+            edPtrs.set(e.pointerId, p);
+            if (edPtrs.size === 2) {                                   // 兩指：縮放 / 移動畫面（優先於任何工具）
+                edGesture = null; boxSelecting = false;
+                document.getElementById('boxSelectOverlay').style.display = 'none';
+                const [a, z] = [...edPtrs.values()];
+                edPinch = { dist: Math.hypot(a.x - z.x, a.y - z.y) || 1, mx: (a.x + z.x) / 2, my: (a.y + z.y) / 2 };
+                return;
+            }
+            if (edPtrs.size === 1) startGesture(p);
+        });
+
+        container.addEventListener('pointermove', (e) => {
+            if (!edPtrs.has(e.pointerId)) return;
+            const p = { x: e.clientX, y: e.clientY };
+            edPtrs.set(e.pointerId, p);
+
+            if (edPinch && edPtrs.size >= 2) {
+                const [a, z] = [...edPtrs.values()];
+                const dist = Math.hypot(a.x - z.x, a.y - z.y) || 1, mx = (a.x + z.x) / 2, my = (a.y + z.y) / 2;
+                panOffset.x += mx - edPinch.mx; panOffset.y += my - edPinch.my;
+                edZoomAt(dist / edPinch.dist, mx, my);
+                edPinch = { dist, mx, my };
+                return;
+            }
+            const gs = edGesture;
+            if (!gs) return;
+            if (gs.type === 'pan') {
+                panOffset.x += p.x - gs.lx; panOffset.y += p.y - gs.ly; gs.lx = p.x; gs.ly = p.y;
+                updateCanvasTransform();
+            } else if (gs.type === 'tap') {
+                if (Math.hypot(p.x - gs.sx, p.y - gs.sy) > 10) gs.moved = true;
+                if (gs.moved) { panOffset.x += p.x - gs.lx; panOffset.y += p.y - gs.ly; updateCanvasTransform(); }
+                gs.lx = p.x; gs.ly = p.y;
+            } else if (gs.type === 'sel') {
+                boxSelectCurrentClient = { x: p.x, y: p.y };
+                updateBoxOverlay();
+            } else if (gs.type === 'text') {
+                const q = getExactCanvasCoords(p.x, p.y);
+                const sticker = stickerDataMap[activeEditingStickerId];
+                sticker.textConfig.x = q.x; sticker.textConfig.y = q.y;
+                renderModalFrame();
+            }
+        });
+
+        const endPtr = (e) => {
+            if (!edPtrs.has(e.pointerId)) return;
+            const p = { x: e.clientX, y: e.clientY };
+            edPtrs.delete(e.pointerId);
+            if (edPinch && edPtrs.size < 2) edPinch = null;
+            if (edPtrs.size === 0) {
+                const gs = edGesture;
+                edGesture = null;
+                const ok = e.type === 'pointerup';
+                if (boxSelecting) {
+                    boxSelecting = false;
+                    document.getElementById('boxSelectOverlay').style.display = 'none';
+                    if (gs && gs.type === 'sel' && ok) applyBoxSelection(boxSelectStartClient.x, boxSelectStartClient.y, boxSelectCurrentClient.x, boxSelectCurrentClient.y, currentMode);
+                }
+                if (gs && gs.type === 'tap' && !gs.moved && ok) {
+                    const q = getExactCanvasCoords(p.x, p.y);
+                    executeMagicWand(q.x, q.y, currentMode === 'restore' ? 'restore' : 'remove');
+                }
+            }
+        };
+        container.addEventListener('pointerup', endPtr);
+        container.addEventListener('pointercancel', endPtr);
+
+        // 電腦版：滑鼠滾輪縮放
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            edZoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX, e.clientY);
+        }, { passive: false });
+
+        document.querySelectorAll('#edModes button').forEach(btn => btn.addEventListener('click', () => setEditMode(btn.dataset.mode)));
+        window.addEventListener('resize', () => { if (document.getElementById('editorModal').style.display === 'flex') { fitPreviewCanvas(); updateCanvasTransform(); } });
     }
 
     function updateBoxOverlay() {
@@ -1963,7 +2062,8 @@
         overlay.style.height = Math.abs(y2 - y1) + 'px';
     }
 
-    function applyBoxSelection(clientX1, clientY1, clientX2, clientY2) {
+    // 框選：這一格影格的矩形範圍強制去除 / 還原
+    function applyBoxSelection(clientX1, clientY1, clientX2, clientY2, mode) {
         const sticker = stickerDataMap[activeEditingStickerId];
         const mask = sticker.masks[currentModalFrame];
         const imgData = sticker.frames[currentModalFrame];
@@ -1981,7 +2081,7 @@
 
         undoStack.push({ type: 'box', frameIndex: currentModalFrame, maskCopy: new Uint8Array(mask) });
 
-        const restoreMode = document.getElementById('boxInverseMode').checked;
+        const restoreMode = mode === 'boxRestore';
         const newValue = restoreMode ? 0 : 255;
 
         for (let y = minY; y <= maxY; y++) {
@@ -1991,6 +2091,7 @@
             }
         }
 
+        setEdHint(restoreMode ? '已框選還原。可按「復原上一步」。' : '已框選去除。可按「復原上一步」。');
         renderModalFrame();
     }
 
@@ -2005,48 +2106,65 @@
         updateCanvasTransform();
     }
 
-    function executeMagicWand(clickX, clickY) {
+    // 點擊去背 / 點擊還原（只處理這一格影格）：
+    //  去背：只在「還看得到」且顏色相近、彼此相連的像素中找，碰到已經透明的外圍就停下來，所以不會越點越縮。
+    //  還原：只在「已經透明」且顏色相近、彼此相連的像素中找。
+    function executeMagicWand(clickX, clickY, mode) {
         const sticker = stickerDataMap[activeEditingStickerId];
         const imgData = sticker.frames[currentModalFrame];
         const mask = sticker.masks[currentModalFrame];
         const w = imgData.width, h = imgData.height;
 
         if (clickX < 0 || clickX >= w || clickY < 0 || clickY >= h) return;
+        const remove = mode !== 'restore';
+
+        const seed = clickY * w + clickX;
+        if (remove && mask[seed] >= 128) { setEdHint('這個位置已經是透明的了。請點圖片上還看得到、想去掉的地方。'); return; }
+        if (!remove && mask[seed] < 128) { setEdHint('這個位置本來就有保留。要找回被去掉的地方，請點已經透明的區域。'); return; }
 
         undoStack.push({ type: 'wand', frameIndex: currentModalFrame, maskCopy: new Uint8Array(mask) });
 
-        const startIdx = (clickY * w + clickX) * 4;
-        const tR = imgData.data[startIdx], tG = imgData.data[startIdx+1], tB = imgData.data[startIdx+2];
+        const d = imgData.data;
+        const tR = d[seed * 4], tG = d[seed * 4 + 1], tB = d[seed * 4 + 2];
         const tol = parseInt(document.getElementById('modalTolRange').value);
         const tolSq = tol * tol * 3;
 
-        const queue = [clickX, clickY];
+        const loc = new Uint8Array(w * h);
         const visited = new Uint8Array(w * h);
-
-        while (queue.length > 0) {
-            const y = queue.pop(), x = queue.pop();
+        const stack = new Int32Array(w * h);
+        let top = 0;
+        const test = (x, y) => {
             const idx = y * w + x;
-            if (visited[idx]) continue;
+            if (visited[idx]) return;
             visited[idx] = 1;
-
-            const pxIdx = idx * 4;
-            const dr = imgData.data[pxIdx] - tR, dg = imgData.data[pxIdx+1] - tG, db = imgData.data[pxIdx+2] - tB;
-
-            if (dr*dr + dg*dg + db*db <= tolSq) {
-                mask[idx] = 255;
-                if (x > 0) queue.push(x - 1, y);
-                if (x < w - 1) queue.push(x + 1, y);
-                if (y > 0) queue.push(x, y - 1);
-                if (y < h - 1) queue.push(x, y + 1);
-            }
+            if ((mask[idx] < 128) !== remove) return;              // 去背只走看得到的；還原只走已透明的
+            const pi = idx * 4;
+            const dr = d[pi] - tR, dg = d[pi + 1] - tG, db = d[pi + 2] - tB;
+            if (dr * dr + dg * dg + db * db <= tolSq) { loc[idx] = 255; stack[top++] = idx; }
+        };
+        test(clickX, clickY);
+        while (top > 0) {
+            const idx = stack[--top];
+            const x = idx % w, y = (idx / w) | 0;
+            if (x > 0) test(x - 1, y);
+            if (x < w - 1) test(x + 1, y);
+            if (y > 0) test(x, y - 1);
+            if (y < h - 1) test(x, y + 1);
         }
 
-        // 🌟 個別編輯點擊去背後，同步套用強制外擴像素
-        const expandPx = parseInt(document.getElementById('modalExpandPixels').value) || 0;
-        if (expandPx > 0) {
-            dilateMask(mask, w, h, expandPx);
+        // 去背外擴：只往「這次點到的那一塊」周圍多擴 N 像素（預設 0），不會再動到整張遮罩
+        if (remove) {
+            const expandPx = parseInt(document.getElementById('modalExpandPixels').value) || 0;
+            if (expandPx > 0) dilateMask(loc, w, h, expandPx);
         }
 
+        let changed = 0;
+        for (let i = 0; i < loc.length; i++) {
+            if (loc[i] !== 255) continue;
+            if (remove ? mask[i] < 255 : mask[i] > 0) { mask[i] = remove ? 255 : 0; changed++; }
+        }
+
+        setEdHint(`${remove ? '已去除被點到的區域' : '已還原被點到的區域'}（${changed} 像素）。可按「復原上一步」。`);
         renderModalFrame();
     }
 
